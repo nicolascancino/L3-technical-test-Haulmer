@@ -78,9 +78,11 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Remove the injected `newID` and `now` from `NewCreateCardHandler`: generate the id with `uuid.NewV7()` and read `time.Now().UTC()` inside `Handle`; adapt tests and callers; add `google/uuid` to `go.mod`.
   Commit: `895f4ac`.
 
-- [ ] **T07 Postgres schema and tables**
+- [x] **T07 Postgres schema and tables**
   `tables/` row structs with `gorm` tags, schema/migration for `cards` (`id` column of type `uuid`, plan D8), GORM dependency, `ErrNotFound`/`ErrDuplicate`, cursor encoding.
-  Commit: _pending_
+  Check: writer observed RED then GREEN; parent re-ran `gofmt`, `go build`, `go vet`, `go test -count=1 ./...` (all green). Commit: `4a61466`.
+  Decisions: schema is one embedded `schema.sql` applied with `tables.Migrate` (no migration tool). `pan_hash` is `UNIQUE`, so a repeated PAN is rejected even with another expiry. Indexes: `(last4, created_at, id)`, `(created_at, id)` and `lower(card_holder_name) text_pattern_ops`. Cursor is URL-safe base64 of `<unixMicro>|<uuid>`. Mapping and cursor live in `repository` (not `tables`, which must not import `domain`).
+  Gap: `gorm.io/driver/postgres` is not in `go.mod` yet (`go mod tidy` drops it until imported); T08 adds it when it opens the connection.
 
 - [ ] **T08 Postgres repositories**
   `CardRepository` implementation. Integration tests (build tag `integration`):
