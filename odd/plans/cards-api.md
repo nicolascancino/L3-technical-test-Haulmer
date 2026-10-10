@@ -69,7 +69,7 @@ Dependency rule: `domain` imports nothing internal; `app` -> `domain`; `ports` -
 | # | Decision | Rationale |
 | :- | :------- | :-------- |
 | D1 | Contract-first HTTP with OpenAPI + `oapi-codegen` + Chi | Convention of the architecture skill; contract is reviewable documentation |
-| D2 | PostgreSQL (RDS) with `pgx`/`database/sql` | Required by the challenge; library to be confirmed in T01 |
+| D2 | PostgreSQL (RDS) with GORM (`gorm.io/gorm` + `gorm.io/driver/postgres`) | Human decision. GORM stays inside `adapters/repository`; `gorm` tags live only on the row structs in `tables/`, never on domain entities. The transactional `updateFn` uses `db.Transaction` with `clause.Locking{Strength: "UPDATE"}` |
 | D3 | Idempotency stored in the same Postgres DB | Atomic with card insert; no extra infra. Redis stays as a documented alternative |
 | D4 | Luhn and expiry validation live in `domain/card.go`, enforced by `NewCard` | Business rules belong to the entity; no entry point can create an invalid card |
 | D5 | API, domain and persistence models are separate | Avoid leaking DB/PAN data through the API |
