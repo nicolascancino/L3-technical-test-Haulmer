@@ -47,18 +47,28 @@ func (r CardRepository) SearchCards(ctx context.Context, filter query.CardFilter
 	return r.page(ctx, q, limit, cursor)
 }
 
+// The cursor is the id of the last row of the previous page. Card ids are UUIDv7 (plan D8),
+// so ordering by id is chronological and unique.
+func parseCursor(token string) (uuid.UUID, error) {
+	id, err := uuid.Parse(token)
+	if err != nil {
+		return uuid.Nil, domain.ErrInvalidCursor
+	}
+	return id, nil
+}
+
 // It fetches one row more than limit: its presence tells there is a next page.
 func (r CardRepository) page(ctx context.Context, q *gorm.DB, limit int, token string) (query.CardPage, error) {
 	if token != "" {
-		c, err := decodeCursor(token)
+		after, err := parseCursor(token)
 		if err != nil {
 			return query.CardPage{}, err
 		}
-		q = q.Where("(created_at, id) > (?, ?)", c.CreatedAt, c.ID)
+		q = q.Where("id > ?", after)
 	}
 
 	var rows []tables.CardRow
-	err := q.WithContext(ctx).Order("created_at, id").Limit(limit + 1).Find(&rows).Error
+	err := q.WithContext(ctx).Order("id").Limit(limit + 1).Find(&rows).Error
 	if err != nil {
 		return query.CardPage{}, err
 	}
@@ -66,12 +76,7 @@ func (r CardRepository) page(ctx context.Context, q *gorm.DB, limit int, token s
 	page := query.CardPage{Items: make([]query.Card, 0, len(rows))}
 	if len(rows) > limit {
 		rows = rows[:limit]
-		last := rows[limit-1]
-		id, err := uuid.Parse(last.ID)
-		if err != nil {
-			return query.CardPage{}, err
-		}
-		page.NextCursor = encodeCursor(cursor{CreatedAt: last.CreatedAt, ID: id})
+		page.NextCursor = rows[limit-1].ID
 	}
 	for _, row := range rows {
 		page.Items = append(page.Items, toQueryCard(row))

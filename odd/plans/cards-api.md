@@ -96,5 +96,5 @@ Dependency rule: `domain` imports nothing internal; `app` -> `domain`; `ports` -
 
 - **PAN protection:** what is stored in `cards` (encrypted PAN, token, hash for `last4` search) depends on the pending research. Phase 1 keeps a `PANProtector`-style port undecided and stores only what the research allows.
 - **Salt rotation:** changing the salt invalidates every stored `panHash`; decide versioning or re-hashing before production.
-- **Cursor format:** opaque cursor over `(created_at, id)`; exact encoding in T07.
+- **Cursor format:** the cursor is the id of the last row of the page; pages are ordered by `id` and fetched with `id > cursor`. It relies on UUIDv7 ids (D8) being time-ordered and unique. Trade-off: ordering is by id, not by exact `created_at`.
 - **`GET /cards:search`:** literal path, no conflict with `/cards/{id}`; verify with the generator in T04.

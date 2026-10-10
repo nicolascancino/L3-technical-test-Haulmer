@@ -10,6 +10,5 @@ CREATE TABLE IF NOT EXISTS cards (
     updated_at        timestamptz NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS cards_last4_created_at_id_idx ON cards (last4, created_at, id);
-CREATE INDEX IF NOT EXISTS cards_created_at_id_idx ON cards (created_at, id);
+CREATE INDEX IF NOT EXISTS cards_last4_id_idx ON cards (last4, id);
 CREATE INDEX IF NOT EXISTS cards_card_holder_name_lower_idx ON cards (lower(card_holder_name) text_pattern_ops);

@@ -64,7 +64,7 @@ func cleanDB(t *testing.T) {
 
 var baseTime = time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
 
-// Each card is created one minute after the previous one, so ordering is deterministic.
+// Ids come from sequential uuid.NewV7() calls, which google/uuid keeps increasing, so id order is creation order.
 func newCard(t *testing.T, minute int, last4, brand, holder string, expMonth, expYear int) *domain.Card {
 	t.Helper()
 	createdAt := baseTime.Add(time.Duration(minute) * time.Minute)
