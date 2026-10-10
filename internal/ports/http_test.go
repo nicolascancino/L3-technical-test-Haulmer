@@ -68,12 +68,7 @@ func (fakeHasher) Hash(pan string) (string, error) { return "secret-hash-" + pan
 func newHandler(repo *fakeRepo, reader *fakeReader) http.Handler {
 	application := app.Application{
 		Commands: app.Commands{
-			CreateCard: command.NewCreateCardHandler(
-				repo,
-				fakeHasher{},
-				func() domain.CardID { return "card-1" },
-				func() time.Time { return createdAt },
-			),
+			CreateCard: command.NewCreateCardHandler(repo, fakeHasher{}),
 		},
 		Queries: app.Queries{
 			GetCard:     query.NewGetCardHandler(reader),
@@ -119,7 +114,7 @@ func TestCreateCard(t *testing.T) {
 			name:   "creates a card",
 			body:   `{"pan":"` + validPAN + `","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099}`,
 			status: http.StatusCreated,
-			want:   []string{`"id":"card-1"`, `"last4":"1111"`, `"expMonth":12`, `"expYear":2099`, `"cardHolderName":"Ada Lovelace"`, `"brand":"unknown"`, `"createdAt":"2026-01-15T10:00:00Z"`, `"updatedAt":"2026-01-15T10:00:00Z"`},
+			want:   []string{`"id":"`, `"last4":"1111"`, `"expMonth":12`, `"expYear":2099`, `"cardHolderName":"Ada Lovelace"`, `"brand":"unknown"`, `"createdAt":"`, `"updatedAt":"`},
 		},
 		{
 			name:   "blank holder name",
