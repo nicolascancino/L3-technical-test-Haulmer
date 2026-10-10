@@ -18,7 +18,7 @@ How to resume:
 Open points to carry into the next tasks:
 
 - T07/T08: the reader returns `domain.ErrInvalidCursor` for a bad cursor and `domain.ErrCardNotFound` for an id that is not a valid UUID (plan D8).
-- T09: resolve `/health` instance from `POD_NAME`, falling back to the hostname; build the UUIDv7 generator with `google/uuid`.
+- T09: resolve `/health` instance from `POD_NAME`, falling back to the hostname.
 - Review advisories not yet handled: `POST /cards` accepts trailing data after the JSON body; `last4` is not checked as digits in `NewCard`/`UnmarshalCardFromDatabase`; `UnmarshalCardFromDatabase` does not validate `createdAt`; domain tests have weak assertions; `app.Application` can be built with zero-value handlers.
 - Deferred phases (not in this list): Luhn and expiry implementation, secure PAN storage (human is researching), idempotency, Secrets Manager, CloudWatch, Dockerfile, Kubernetes, AWS deployment.
 
@@ -74,6 +74,10 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Part 1 (model fields, `PANHasher`, contract fields): commit `0165f94`; reviewed, approved. Advisory for later: `UnmarshalCardFromDatabase` does not validate `brand`.
   Part 2 (search filters and pagination): commit `e979f65`. Follow-up for T09: when building the generated handler, set `ErrorHandlerFunc` so wrapper errors (missing `last4`, non-integer `limit`) answer the JSON error style instead of `text/plain`.
 
+- [x] **T06c Simplify CreateCard dependencies (plan D6, D8)**
+  Remove the injected `newID` and `now` from `NewCreateCardHandler`: generate the id with `uuid.NewV7()` and read `time.Now().UTC()` inside `Handle`; adapt tests and callers; add `google/uuid` to `go.mod`.
+  Commit: `895f4ac`.
+
 - [ ] **T07 Postgres schema and tables**
   `tables/` row structs with `gorm` tags, schema/migration for `cards` (`id` column of type `uuid`, plan D8), GORM dependency, `ErrNotFound`/`ErrDuplicate`, cursor encoding.
   Commit: _pending_
@@ -84,7 +88,7 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Commit: _pending_
 
 - [ ] **T09 Composition root and entry point**
-  `service/application.go`, `cmd/api/main.go`, `internal/config` (plan D12), HMAC `PANHasher` adapter, Secrets Manager client with env fallback, graceful shutdown, UUIDv7 id generator with `google/uuid` (plan D8).
+  `service/application.go`, `cmd/api/main.go`, `internal/config` (plan D12), HMAC `PANHasher` adapter, Secrets Manager client with env fallback, graceful shutdown.
   Check: service starts against a local Postgres and answers `/health`. Commit: _pending_
 
 ## Phase 4 — Delivery of this stage
