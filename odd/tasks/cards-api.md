@@ -7,10 +7,11 @@ Check a box only after the outcome and its checks were observed. Record the comm
 
 ## Phase 1 — Skeleton
 
-- [ ] **T01 Bootstrap project**
+- [x] **T01 Bootstrap project**
   `go.mod` (module `github.com/nicolascancino/L3-technical-test-Haulmer-`), remove invalid `internal/A.go`,
   create layer folders, `Makefile`, `.gitignore` additions, pin `oapi-codegen` as a Go tool, confirm DB library.
-  Check: `go build ./...` and `go vet ./...` pass. Commit: _pending_
+  Check: `go build ./...` and `go vet ./...` pass (observed). Commit: `cc61fa5`.
+  Note: DB library = `database/sql` with the pgx stdlib driver (added in T07); `make` is not installed on this Windows machine, run the `go` commands directly.
 
 - [ ] **T02 Domain model and ports (signatures only)**
   `Card` entity in `card.go` (private fields, `NewCard`, `UnmarshalCardFromDatabase`, getters) with `validatePAN` (Luhn) and
