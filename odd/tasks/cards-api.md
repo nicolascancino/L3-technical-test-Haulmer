@@ -24,9 +24,10 @@ Check a box only after the outcome and its checks were observed. Record the comm
   Check: `go tool oapi-codegen -generate types,chi-server` parses it and yields the 5 `ServerInterface` methods, including `/cards:search` (observed). Commit: `05b9f0e`.
   Decisions: `400` malformed request, `422` business-rule violation (invalid PAN, expired card), `404` unknown card. Responses never include the PAN. `limit` bounds and defaults live in `ports/`, not in the schema.
 
-- [ ] **T04 Code generation**
+- [x] **T04 Code generation**
   `scripts/openapi-http.sh`, `make openapi_http`, commit generated `internal/ports/*.gen.go`.
-  Check: generation is reproducible; `/cards:search` and `/cards/{id}` both generate. Commit: _pending_
+  Check: regenerating yields identical checksums; a throwaway router test confirmed `/cards:search?last4=` and `/cards/{id}` dispatch to `SearchCards` and `GetCard` (observed, probe removed). Commit: `17668e5`.
+  Note: without `make`, run `./scripts/openapi-http.sh cards internal/ports ports` directly. `go mod tidy` added chi and the oapi-codegen runtime.
 
 ## Phase 2 — Application and ports
 
