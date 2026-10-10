@@ -121,10 +121,10 @@ func TestAddAndGetCard(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got.ID() != want.ID() || got.Last4() != want.Last4() || got.Brand() != want.Brand() ||
-		got.CardHolderName() != want.CardHolderName() || got.PANHash() != want.PANHash() ||
-		got.ExpMonth() != want.ExpMonth() || got.ExpYear() != want.ExpYear() ||
-		!got.CreatedAt().Equal(want.CreatedAt()) || !got.UpdatedAt().Equal(want.UpdatedAt()) {
+	if got.ID != string(want.ID()) || got.Last4 != want.Last4() || got.Brand != string(want.Brand()) ||
+		got.CardHolderName != want.CardHolderName() ||
+		got.ExpMonth != want.ExpMonth() || got.ExpYear != want.ExpYear() ||
+		!got.CreatedAt.Equal(want.CreatedAt()) || !got.UpdatedAt.Equal(want.UpdatedAt()) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
 }
@@ -160,7 +160,6 @@ func TestAddCardRejectsDuplicates(t *testing.T) {
 func TestGetCardNotFound(t *testing.T) {
 	cleanDB(t)
 	repo := repository.NewCardRepository(testDB)
-	reader := repository.NewCardReader(testDB)
 	ids := map[string]domain.CardID{
 		"unknown uuid": domain.CardID(uuid.Must(uuid.NewV7()).String()),
 		"not a uuid":   "not-a-uuid",
@@ -169,10 +168,7 @@ func TestGetCardNotFound(t *testing.T) {
 	for name, id := range ids {
 		t.Run(name, func(t *testing.T) {
 			if _, err := repo.GetCard(context.Background(), id); !errors.Is(err, domain.ErrCardNotFound) {
-				t.Errorf("repository: got %v, want ErrCardNotFound", err)
-			}
-			if _, err := reader.GetCard(context.Background(), id); !errors.Is(err, domain.ErrCardNotFound) {
-				t.Errorf("reader: got %v, want ErrCardNotFound", err)
+				t.Errorf("got %v, want ErrCardNotFound", err)
 			}
 		})
 	}
@@ -182,7 +178,7 @@ func TestReaderGetCard(t *testing.T) {
 	cleanDB(t)
 	cards := seedCards(t)
 
-	got, err := repository.NewCardReader(testDB).GetCard(context.Background(), cards[0].ID())
+	got, err := repository.NewCardRepository(testDB).GetCard(context.Background(), cards[0].ID())
 
 	if err != nil {
 		t.Fatal(err)
@@ -195,7 +191,7 @@ func TestReaderGetCard(t *testing.T) {
 func TestListCardsPaginates(t *testing.T) {
 	cleanDB(t)
 	cards := seedCards(t)
-	reader := repository.NewCardReader(testDB)
+	reader := repository.NewCardRepository(testDB)
 
 	var gotIDs []string
 	cursor := ""
@@ -226,7 +222,7 @@ func TestListCardsPaginates(t *testing.T) {
 
 func TestInvalidCursor(t *testing.T) {
 	cleanDB(t)
-	reader := repository.NewCardReader(testDB)
+	reader := repository.NewCardRepository(testDB)
 
 	_, listErr := reader.ListCards(context.Background(), 10, "!!!")
 	_, searchErr := reader.SearchCards(context.Background(), query.CardFilter{Last4: "1111"}, 10, "!!!")
@@ -239,7 +235,7 @@ func TestInvalidCursor(t *testing.T) {
 func TestSearchCards(t *testing.T) {
 	cleanDB(t)
 	seedCards(t)
-	reader := repository.NewCardReader(testDB)
+	reader := repository.NewCardRepository(testDB)
 
 	tests := []struct {
 		name   string
@@ -309,7 +305,7 @@ func TestSearchCards(t *testing.T) {
 func TestSearchCardsPaginates(t *testing.T) {
 	cleanDB(t)
 	seedCards(t)
-	reader := repository.NewCardReader(testDB)
+	reader := repository.NewCardRepository(testDB)
 	filter := query.CardFilter{Last4: "1111"}
 
 	var pageSizes []int

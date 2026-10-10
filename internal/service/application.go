@@ -42,7 +42,6 @@ func NewApplication(ctx context.Context, cfg config.Config) (app.Application, er
 	}
 
 	cards := repository.NewCardRepository(db)
-	reader := repository.NewCardReader(db)
 	hasher := security.NewHMACPANHasher(panSalt)
 
 	return app.Application{
@@ -50,9 +49,9 @@ func NewApplication(ctx context.Context, cfg config.Config) (app.Application, er
 			CreateCard: command.NewCreateCardHandler(cards, hasher),
 		},
 		Queries: app.Queries{
-			GetCard:     query.NewGetCardHandler(reader),
-			ListCards:   query.NewListCardsHandler(reader),
-			SearchCards: query.NewSearchCardsHandler(reader),
+			GetCard:     query.NewGetCardHandler(cards),
+			ListCards:   query.NewListCardsHandler(cards),
+			SearchCards: query.NewSearchCardsHandler(cards),
 		},
 	}, nil
 }

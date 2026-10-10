@@ -27,10 +27,6 @@ type fakeRepo struct{ err error }
 
 func (r *fakeRepo) AddCard(context.Context, *domain.Card) error { return r.err }
 
-func (r *fakeRepo) GetCard(context.Context, domain.CardID) (*domain.Card, error) {
-	return nil, domain.ErrCardNotFound
-}
-
 type fakeReader struct {
 	card query.Card
 	page query.CardPage

@@ -18,15 +18,7 @@ func escapeLike(s string) string {
 	return likeEscaper.Replace(s)
 }
 
-type CardReader struct {
-	db *gorm.DB
-}
-
-func NewCardReader(db *gorm.DB) CardReader {
-	return CardReader{db: db}
-}
-
-func (r CardReader) GetCard(ctx context.Context, id domain.CardID) (query.Card, error) {
+func (r CardRepository) GetCard(ctx context.Context, id domain.CardID) (query.Card, error) {
 	row, err := findCardRow(ctx, r.db, id)
 	if err != nil {
 		return query.Card{}, err
@@ -34,11 +26,11 @@ func (r CardReader) GetCard(ctx context.Context, id domain.CardID) (query.Card, 
 	return toQueryCard(row), nil
 }
 
-func (r CardReader) ListCards(ctx context.Context, limit int, cursor string) (query.CardPage, error) {
+func (r CardRepository) ListCards(ctx context.Context, limit int, cursor string) (query.CardPage, error) {
 	return r.page(ctx, r.db.Model(&tables.CardRow{}), limit, cursor)
 }
 
-func (r CardReader) SearchCards(ctx context.Context, filter query.CardFilter, limit int, cursor string) (query.CardPage, error) {
+func (r CardRepository) SearchCards(ctx context.Context, filter query.CardFilter, limit int, cursor string) (query.CardPage, error) {
 	q := r.db.Model(&tables.CardRow{}).Where("last4 = ?", filter.Last4)
 	if filter.Brand != "" {
 		q = q.Where("brand = ?", filter.Brand)
@@ -56,7 +48,7 @@ func (r CardReader) SearchCards(ctx context.Context, filter query.CardFilter, li
 }
 
 // It fetches one row more than limit: its presence tells there is a next page.
-func (r CardReader) page(ctx context.Context, q *gorm.DB, limit int, token string) (query.CardPage, error) {
+func (r CardRepository) page(ctx context.Context, q *gorm.DB, limit int, token string) (query.CardPage, error) {
 	if token != "" {
 		c, err := decodeCursor(token)
 		if err != nil {

@@ -25,10 +25,6 @@ func (r *fakeRepo) AddCard(_ context.Context, c *domain.Card) error {
 	return nil
 }
 
-func (r *fakeRepo) GetCard(context.Context, domain.CardID) (*domain.Card, error) {
-	return nil, domain.ErrCardNotFound
-}
-
 var errHash = errors.New("hash failure")
 
 type fakeHasher struct {

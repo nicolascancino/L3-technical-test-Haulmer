@@ -2,9 +2,8 @@ package domain
 
 import "context"
 
-// No Update method: a card has no state transitions. Listing and last4 search
-// are read models and live in app/query.
+// No Update or Get methods: a card has no state transitions and reads are
+// served by app/query.
 type CardRepository interface {
 	AddCard(ctx context.Context, c *Card) error
-	GetCard(ctx context.Context, id CardID) (*Card, error)
 }

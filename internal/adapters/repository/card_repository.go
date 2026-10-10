@@ -8,10 +8,12 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/adapters/repository/tables"
+	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/app/query"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/domain"
 )
 
-// The connection must be opened with gorm.Config{TranslateError: true} so unique
+// It is both the write port and the read model. The connection must be opened
+// with gorm.Config{TranslateError: true} so unique
 // violations surface as gorm.ErrDuplicatedKey.
 type CardRepository struct {
 	db *gorm.DB
@@ -34,14 +36,6 @@ func (r CardRepository) AddCard(ctx context.Context, c *domain.Card) error {
 	return err
 }
 
-func (r CardRepository) GetCard(ctx context.Context, id domain.CardID) (*domain.Card, error) {
-	row, err := findCardRow(ctx, r.db, id)
-	if err != nil {
-		return nil, err
-	}
-	return cardRow(row).toDomain()
-}
-
 func findCardRow(ctx context.Context, db *gorm.DB, id domain.CardID) (tables.CardRow, error) {
 	uid, err := parseCardID(id)
 	if err != nil {
@@ -54,3 +48,8 @@ func findCardRow(ctx context.Context, db *gorm.DB, id domain.CardID) (tables.Car
 	}
 	return row, err
 }
+
+var (
+	_ domain.CardRepository = CardRepository{}
+	_ query.CardReader      = CardRepository{}
+)
