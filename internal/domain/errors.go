@@ -11,4 +11,5 @@ var (
 	ErrInvalidLast4        = errors.New("last4 must be exactly 4 digits")
 	ErrCardNotFound        = errors.New("card not found")
 	ErrCardAlreadyExists   = errors.New("card already exists")
+	ErrInvalidCursor       = errors.New("invalid cursor")
 )
