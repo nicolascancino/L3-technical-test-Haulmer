@@ -87,11 +87,16 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
 - [ ] **T08 Postgres repositories**
   `CardRepository` implementation. Integration tests (build tag `integration`):
   round-trip, duplicate, not-found, rollback.
-  Commit: _pending_
+  Commit: `5e6fe48` (code and integration tests written, box stays open).
+  Pending: run `go test -tags integration ./internal/adapters/repository/` with Docker up; the SQL was never executed against Postgres. Unit and `go vet -tags integration` are green.
+  Note: the connection must use `gorm.Config{TranslateError: true}` (wired in T09). Added `gorm.io/driver/postgres` and `testcontainers-go`.
 
 - [ ] **T09 Composition root and entry point**
   `service/application.go`, `cmd/api/main.go`, `internal/config` (plan D12), HMAC `PANHasher` adapter, Secrets Manager client with env fallback, graceful shutdown.
-  Check: service starts against a local Postgres and answers `/health`. Commit: _pending_
+  Check: service starts against a local Postgres and answers `/health`.
+  Commits: `a52b17f` (config, hasher, secrets), `1cf833f` (service, main). Box stays open.
+  Observed: `gofmt`, `go build`, `go vet`, `go vet -tags integration`, `go test -count=1 ./...` green; writer saw RED then GREEN for config, hasher, secrets fallback and the JSON error handler.
+  Pending: start the server against Postgres and call `/health`; the AWS Secrets Manager path was never exercised. Env vars: `PORT`, `POD_NAME`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_SSLMODE` (default `require`), `DB_PASSWORD`, `PAN_SALT`, `AWS_REGION`, `DB_PASSWORD_SECRET_ID`, `PAN_SALT_SECRET_ID`.
 
 ## Phase 4 — Delivery of this stage
 
