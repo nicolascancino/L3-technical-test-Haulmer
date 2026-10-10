@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 )
 
@@ -12,10 +13,20 @@ const (
 	Cloud Env = "cloud"
 )
 
+type LogFormat string
+
+const (
+	LogText LogFormat = "text"
+	LogJSON LogFormat = "json"
+)
+
 type Config struct {
 	Env     Env
 	Port    string
 	PodName string
+
+	LogLevel  slog.Level
+	LogFormat LogFormat
 
 	DBHost     string
 	DBPort     string
@@ -72,10 +83,32 @@ func Load(getenv func(string) string) (Config, error) {
 	require("DB_NAME", cfg.DBName)
 	require("DB_USER", cfg.DBUser)
 
+	level, ok := logLevels[valueOr(getenv("LOG_LEVEL"), "info")]
+	if !ok {
+		missing = append(missing, `LOG_LEVEL (must be "debug", "info", "warn" or "error")`)
+	}
+	cfg.LogLevel = level
+
+	defaultFormat := LogText
+	if cfg.Env == Cloud {
+		defaultFormat = LogJSON
+	}
+	cfg.LogFormat = LogFormat(valueOr(getenv("LOG_FORMAT"), string(defaultFormat)))
+	if cfg.LogFormat != LogText && cfg.LogFormat != LogJSON {
+		missing = append(missing, `LOG_FORMAT (must be "text" or "json")`)
+	}
+
 	if len(missing) > 0 {
 		return Config{}, fmt.Errorf("invalid environment: %s", strings.Join(missing, ", "))
 	}
 	return cfg, nil
+}
+
+var logLevels = map[string]slog.Level{
+	"debug": slog.LevelDebug,
+	"info":  slog.LevelInfo,
+	"warn":  slog.LevelWarn,
+	"error": slog.LevelError,
 }
 
 func valueOr(value, fallback string) string {

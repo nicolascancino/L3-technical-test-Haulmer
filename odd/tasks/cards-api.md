@@ -108,6 +108,8 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
 - [ ] **T11 Observability for CloudWatch**
   Structured JSON logs to stdout (`slog`), a request-logging middleware (method, route, status, latency, request id, never the PAN or `panHash`), and basic request metrics (count, latency, status) for CloudWatch.
   Decide before starting: metrics through CloudWatch Embedded Metric Format in the logs (no extra SDK) or `PutMetricData`. Requirement: "basic logs and metrics in CloudWatch" (requirements file, section A; idea C7).
+  Step 1 done (human-approved): `log/slog` logger built once in `main` and injected (`internal/logging`), `TextHandler` or `JSONHandler` by `LOG_FORMAT`, `LOG_LEVEL`, fixed attributes `service`/`env`/`instance`, UTC RFC3339 time, masking of sensitive keys (also in groups), source only at debug. No new dependency.
+  Remaining steps: request id middleware, request log with latency, RED metrics via EMF.
   Check: logs and metrics emitted by a handler test; no card data in any log line. Commit: _pending_
 
 ## Deferred (separate phases, not part of this list)

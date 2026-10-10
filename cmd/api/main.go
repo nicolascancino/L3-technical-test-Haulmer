@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/config"
+	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/logging"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/ports"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/service"
 )
@@ -32,19 +33,27 @@ func run() error {
 		return err
 	}
 
+	instance := cfg.PodName
+	if instance == "" {
+		if instance, err = os.Hostname(); err != nil {
+			return err
+		}
+	}
+
+	logger := logging.New(os.Stdout, logging.Options{
+		Level:    cfg.LogLevel,
+		Format:   cfg.LogFormat,
+		Env:      cfg.Env,
+		Instance: instance,
+	})
+	slog.SetDefault(logger)
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	application, err := service.NewApplication(ctx, cfg)
 	if err != nil {
 		return err
-	}
-
-	instance := cfg.PodName
-	if instance == "" {
-		if instance, err = os.Hostname(); err != nil {
-			return err
-		}
 	}
 
 	server := &http.Server{
@@ -55,7 +64,7 @@ func run() error {
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- server.ListenAndServe() }()
-	slog.Info("api listening", "addr", server.Addr, "instance", instance)
+	logger.Info("api listening", "addr", server.Addr)
 
 	select {
 	case err := <-serveErr:

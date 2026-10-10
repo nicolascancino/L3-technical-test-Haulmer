@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"strings"
 	"testing"
 )
@@ -153,5 +154,54 @@ func TestLoad_CloudIgnoresPlainValues(t *testing.T) {
 	}
 	if cfg.DBPassword != "" || cfg.PANSalt != "" {
 		t.Errorf("plain values were read in cloud: %+v", cfg)
+	}
+}
+
+func TestLoad_LoggingDefaultsFollowAppEnv(t *testing.T) {
+	local, err := Load(env(validEnv()))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if local.LogLevel != slog.LevelInfo || local.LogFormat != LogText {
+		t.Errorf("local logging = %v, %q", local.LogLevel, local.LogFormat)
+	}
+
+	cloud, err := Load(env(cloudEnv()))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cloud.LogLevel != slog.LevelInfo || cloud.LogFormat != LogJSON {
+		t.Errorf("cloud logging = %v, %q", cloud.LogLevel, cloud.LogFormat)
+	}
+}
+
+func TestLoad_ReadsLoggingOverrides(t *testing.T) {
+	values := cloudEnv()
+	values["LOG_LEVEL"] = "debug"
+	values["LOG_FORMAT"] = "text"
+
+	cfg, err := Load(env(values))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.LogLevel != slog.LevelDebug || cfg.LogFormat != LogText {
+		t.Errorf("logging = %v, %q", cfg.LogLevel, cfg.LogFormat)
+	}
+}
+
+func TestLoad_ReportsInvalidLoggingValuesWithOtherErrors(t *testing.T) {
+	values := validEnv()
+	delete(values, "DB_HOST")
+	values["LOG_LEVEL"] = "verbose"
+	values["LOG_FORMAT"] = "xml"
+
+	_, err := Load(env(values))
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	for _, name := range []string{"DB_HOST", "LOG_LEVEL", "LOG_FORMAT"} {
+		if !strings.Contains(err.Error(), name) {
+			t.Errorf("error %q does not name %s", err, name)
+		}
 	}
 }
