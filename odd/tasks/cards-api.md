@@ -5,21 +5,21 @@ Plan: [`odd/plans/cards-api.md`](../plans/cards-api.md)
 Rules: one task = one reviewable work unit = at least one Conventional Commit on a feature branch.
 Check a box only after the outcome and its checks were observed. Record the commit hash as evidence.
 
-## Handoff (end of day 1, 2026-10-10)
+## Handoff (updated 2026-10-10)
 
-Status: T01 to T06 done and reviewed (6 of 11). Branch `feat/cards-api`, nothing pushed yet. Plan updates D10 to D13 and task T06b are written but not committed. Next: **T06b**, then T07.
+Status: T01 to T06, T06b and T06c done and reviewed (8 of 12). Branch `feat/cards-api`, nothing pushed yet. Next: **T07**.
 
 How to resume:
 
 1. `git switch feat/cards-api`, then run `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test -count=1 ./...` (all green at this point).
-2. Read plan decisions D1 to D9 in [`odd/plans/cards-api.md`](../plans/cards-api.md).
+2. Read plan decisions D1 to D13 in [`odd/plans/cards-api.md`](../plans/cards-api.md).
 3. Start T07 below. It adds the GORM and Postgres driver dependencies.
 
 Open points to carry into the next tasks:
 
 - T07/T08: the reader returns `domain.ErrInvalidCursor` for a bad cursor and `domain.ErrCardNotFound` for an id that is not a valid UUID (plan D8).
-- T09: resolve `/health` instance from `POD_NAME`, falling back to the hostname.
-- Review advisories not yet handled: `POST /cards` accepts trailing data after the JSON body; `last4` is not checked as digits in `NewCard`/`UnmarshalCardFromDatabase`; `UnmarshalCardFromDatabase` does not validate `createdAt`; domain tests have weak assertions; `app.Application` can be built with zero-value handlers.
+- T09: resolve `/health` instance from `POD_NAME`, falling back to the hostname; set `ErrorHandlerFunc` on the generated handler so wrapper errors use the JSON error style.
+- Review advisories not yet handled: `POST /cards` accepts trailing data after the JSON body; `last4` is not checked as digits in `NewCard`/`UnmarshalCardFromDatabase`; `UnmarshalCardFromDatabase` does not validate `createdAt` or `brand`; domain tests have weak assertions; `app.Application` can be built with zero-value handlers.
 - Deferred phases (not in this list): Luhn and expiry implementation, secure PAN storage (human is researching), idempotency, Secrets Manager, CloudWatch, Dockerfile, Kubernetes, AWS deployment.
 
 Workflow reminders: generate API code with `./scripts/openapi-http.sh cards internal/ports ports` (no `make`); review one task by starting with `baseRef` set to the full sha of the previous commit; the review lens models live in `~/.pi/gentle-ai/models.json`; a candidate with a shell script is high risk and needs 4 reviewer runs, so ask first.
