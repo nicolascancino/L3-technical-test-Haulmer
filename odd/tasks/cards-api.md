@@ -7,7 +7,7 @@ Check a box only after the outcome and its checks were observed. Record the comm
 
 ## Handoff (end of day 1, 2026-10-10)
 
-Status: T01 to T06 done and reviewed (6 of 10). Branch `feat/cards-api`, nothing pushed yet. Next: **T07**.
+Status: T01 to T06 done and reviewed (6 of 11). Branch `feat/cards-api`, nothing pushed yet. Plan updates D10 to D13 and task T06b are written but not committed. Next: **T06b**, then T07.
 
 How to resume:
 
@@ -66,6 +66,12 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
 
 ## Phase 3 — Persistence and wiring
 
+- [ ] **T06b Extend the card model (plan D10)**
+  Add `cardHolderName`, `brand`, `panHash` and `updatedAt` to `domain.Card`, `NewCard`, `UnmarshalCardFromDatabase` and getters; `detectBrand` as a signature-only function.
+  Update `cards.yml` (request: `cardHolderName`; response: `cardHolderName`, `brand`, `updatedAt`; never `panHash`), regenerate, add the `PANHasher` port (plan D11) with a fake in tests, adapt `command.CreateCard` (computes `panHash`), `query` read model and `ports` mapping, with tests.
+  Search (plan D13): add optional `brand`, `cardHolderName`, `expMonth`, `expYear`, `limit` and `cursor` to `cards:search` in the contract, regenerate, extend `query.SearchCards` and the `CardReader` signature, validate in `ports`, with tests.
+  Must land before T07 so the table is designed once. Commit: _pending_
+
 - [ ] **T07 Postgres schema and tables**
   `tables/` row structs with `gorm` tags, schema/migration for `cards` (`id` column of type `uuid`, plan D8), GORM dependency, `ErrNotFound`/`ErrDuplicate`, cursor encoding.
   Commit: _pending_
@@ -76,7 +82,7 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Commit: _pending_
 
 - [ ] **T09 Composition root and entry point**
-  `service/application.go`, `cmd/api/main.go`, configuration from environment, graceful shutdown, UUIDv7 id generator with `google/uuid` (plan D8).
+  `service/application.go`, `cmd/api/main.go`, `internal/config` (plan D12), HMAC `PANHasher` adapter, Secrets Manager client with env fallback, graceful shutdown, UUIDv7 id generator with `google/uuid` (plan D8).
   Check: service starts against a local Postgres and answers `/health`. Commit: _pending_
 
 ## Phase 4 — Delivery of this stage
@@ -86,6 +92,8 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Commit: _pending_
 
 ## Deferred (separate phases, not part of this list)
+
+Optional improvements to review at the end of the project live in [`odd/requirements-and-improvements.md`](../requirements-and-improvements.md), section C.
 
 - Idempotency (`Idempotency-Key`, same Postgres DB; draft in plan section 5)
 - Luhn and expiry implementation (+ domain tests)

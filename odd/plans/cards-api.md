@@ -13,7 +13,7 @@ REST API in Go to create and query credit cards.
 | POST   | `/cards`                   | Create a card (idempotent via `Idempotency-Key`)     |
 | GET    | `/cards/{id}`              | Get a card by id                                     |
 | GET    | `/cards?limit=&cursor=`    | List cards, cursor pagination                        |
-| GET    | `/cards:search?last4=`     | Search cards by last 4 digits of the PAN             |
+| GET    | `/cards:search?last4=&...` | Search by last 4 digits, optional filters, paginated |
 | GET    | `/health`                  | Liveness; must identify the serving instance         |
 
 ## 2. Scope of this phase
@@ -43,8 +43,9 @@ scripts/openapi-http.sh          code generation
 Makefile                         make openapi_http
 internal/
 ├── domain/                      pure Go, no infrastructure imports
-│   ├── card.go                  Card entity (private fields), NewCard, UnmarshalCardFromDatabase,
-│   │                            validatePAN (Luhn) and validateExpiry -> signatures only, called by NewCard
+│   ├── card.go                  Card entity (private fields: id, cardHolderName, brand, last4, panHash,
+│   │                            expMonth, expYear, createdAt, updatedAt), NewCard, UnmarshalCardFromDatabase,
+│   │                            validatePAN (Luhn), detectBrand and validateExpiry -> signatures only, called by NewCard
 │   ├── repository.go            CardRepository interface (IdempotencyRepository deferred)
 │   └── errors.go                ErrCardNotFound, ErrInvalidPAN, ErrCardExpired, ...
 ├── app/
@@ -58,6 +59,7 @@ internal/
 │   ├── tables/                  row structs, schema, shared errors
 │   ├── card_repository.go
 │   (idempotency_repository.go deferred)
+├── config/                      env loading and validation, read once at startup
 └── service/application.go       composition root
 ```
 
@@ -74,9 +76,13 @@ Dependency rule: `domain` imports nothing internal; `app` -> `domain`; `ports` -
 | D4 | Luhn and expiry validation live in `domain/card.go`, enforced by `NewCard` | Business rules belong to the entity; no entry point can create an invalid card |
 | D5 | API, domain and persistence models are separate | Avoid leaking DB/PAN data through the API |
 | D6 | Time and IDs injected, never `time.Now()` in domain | Testability |
-| D7 | `/health` returns instance identity (`POD_NAME` if set, hostname otherwise) | Required by the challenge; useful behind a k8s Service |
+| D7 | `/health` returns instance identity (`POD_NAME` if set, hostname otherwise) | Lets operators tell replicas apart behind the load balancer; useful behind a k8s Service |
 | D8 | Card ids are UUIDv7, generated in `service` with `google/uuid`; `domain.CardID` stays a string and the column type is `uuid` | Time-ordered ids keep the Postgres primary key index compact and make cursor pagination simple. An id that is not a valid UUID is reported as not found by the repository adapter |
 | D9 | Constructors of app handlers keep panicking on nil dependencies | Human decision for now: failing at startup is intended; revisit returning `(T, error)` later |
+| D10 | `Card` also carries `cardHolderName`, `brand`, `panHash` and `updatedAt`. `brand` is derived from the PAN inside the domain; `panHash` is computed outside the domain and received as an opaque string; `updatedAt` equals `createdAt` on creation and is injected like every other timestamp | Human decision. The domain must not know the hashing algorithm or its salt (those belong to secure PAN storage); `panHash` and the PAN never appear in API responses |
+| D11 | `panHash = HMAC-SHA256(pan, salt)`, computed in `command.CreateCard` through a `PANHasher` port defined next to the command; the HMAC adapter lives in `adapters/security`. Brand is derived by `detectBrand` in the domain (Visa, Mastercard, Amex, others by prefix), signature only until the Luhn phase | Human decision. Hashing needs a secret, so it is an application concern and the domain only receives the result. The same card always yields the same hash, which enables duplicate detection without storing the PAN. HMAC rather than a plain `SHA256(pan+salt)` to avoid length-extension and misuse |
+| D12 | Configuration is loaded once at startup by `internal/config` (environment variables only: port, database settings, AWS region, secret ids, `POD_NAME`) and handed to `service`; no other package reads the environment. The salt and the database credentials come from AWS Secrets Manager through `adapters/secrets` (AWS SDK v2), with an environment fallback for local runs | Human decision (AWS services). One place to see and validate every setting, and a fast failure on a missing value. The PAN space is small, so the salt must stay secret and its rotation needs a plan |
+| D13 | `GET /cards:search` keeps `last4` required and adds optional filters `brand` (exact), `cardHolderName` (case-insensitive prefix) and `expMonth`/`expYear`, combined with AND, plus `limit` and `cursor` with the same rules and cursor as the list | Human decision. `last4` has only 10,000 values, so the result can be large and needs a bound; the extra filters narrow it without turning the endpoint into an unbounded listing. The holder name is personal data, so only a prefix match is offered and it needs an index on `lower(card_holder_name)` |
 
 ## 5. Idempotency semantics (DEFERRED draft, not part of this phase)
 
@@ -89,6 +95,6 @@ Dependency rule: `domain` imports nothing internal; `app` -> `domain`; `ports` -
 ## 6. Open points
 
 - **PAN protection:** what is stored in `cards` (encrypted PAN, token, hash for `last4` search) depends on the pending research. Phase 1 keeps a `PANProtector`-style port undecided and stores only what the research allows.
+- **Salt rotation:** changing the salt invalidates every stored `panHash`; decide versioning or re-hashing before production.
 - **Cursor format:** opaque cursor over `(created_at, id)`; exact encoding in T07.
 - **`GET /cards:search`:** literal path, no conflict with `/cards/{id}`; verify with the generator in T04.
-- **Module path:** `github.com/nicolascancino/L3-technical-test-Haulmer-` (from `origin`).
