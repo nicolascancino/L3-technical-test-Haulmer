@@ -31,15 +31,14 @@ func (r *fakeRepo) GetCard(context.Context, domain.CardID) (*domain.Card, error)
 }
 
 type fakeReader struct {
-	card  query.Card
-	page  query.CardPage
-	cards []query.Card
-	err   error
+	card query.Card
+	page query.CardPage
+	err  error
 
 	gotID     domain.CardID
 	gotLimit  int
 	gotCursor string
-	gotLast4  string
+	gotFilter query.CardFilter
 }
 
 func (r *fakeReader) GetCard(_ context.Context, id domain.CardID) (query.Card, error) {
@@ -52,9 +51,9 @@ func (r *fakeReader) ListCards(_ context.Context, limit int, cursor string) (que
 	return r.page, r.err
 }
 
-func (r *fakeReader) SearchByLast4(_ context.Context, last4 string) ([]query.Card, error) {
-	r.gotLast4 = last4
-	return r.cards, r.err
+func (r *fakeReader) SearchCards(_ context.Context, filter query.CardFilter, limit int, cursor string) (query.CardPage, error) {
+	r.gotFilter, r.gotLimit, r.gotCursor = filter, limit, cursor
+	return r.page, r.err
 }
 
 var sampleCard = query.Card{
@@ -258,34 +257,85 @@ func TestListCards(t *testing.T) {
 }
 
 func TestSearchCards(t *testing.T) {
+	const base = "/cards:search?last4=1234"
+	next := query.CardPage{Items: []query.Card{sampleCard}, NextCursor: "abc"}
+	invalid := func(slug string) []string { return []string{`"slug":"` + slug + `"`} }
 	tests := []struct {
-		name    string
-		target  string
-		cards   []query.Card
-		status  int
-		want    []string
-		reached bool
+		name       string
+		target     string
+		page       query.CardPage
+		err        error
+		status     int
+		want       []string
+		wantFilter query.CardFilter
+		wantLimit  int
+		wantCursor string
+		reached    bool
 	}{
-		{name: "valid", target: "/cards:search?last4=1234", cards: []query.Card{sampleCard}, status: 200, want: []string{`"id":"card-1"`}, reached: true},
-		{name: "empty result", target: "/cards:search?last4=1234", status: 200, want: []string{`"items":[]`}, reached: true},
-		{name: "non digit", target: "/cards:search?last4=12a4", status: 400, want: []string{`"slug":"invalid_last4"`}},
-		{name: "too short", target: "/cards:search?last4=123", status: 400, want: []string{`"slug":"invalid_last4"`}},
-		{name: "too long", target: "/cards:search?last4=12345", status: 400, want: []string{`"slug":"invalid_last4"`}},
+		{
+			name: "last4 only uses default limit", target: base, status: 200, want: []string{`"items":[]`},
+			wantFilter: query.CardFilter{Last4: "1234"}, wantLimit: 20, reached: true,
+		},
+		{
+			name: "page with next cursor", target: base, page: next, status: 200,
+			want:       []string{`"id":"card-1"`, `"nextCursor":"abc"`},
+			wantFilter: query.CardFilter{Last4: "1234"}, wantLimit: 20, reached: true,
+		},
+		{
+			name:   "all filters",
+			target: base + "&brand=visa&cardHolderName=Ada&expMonth=12&expYear=2030&limit=50&cursor=xyz",
+			status: 200,
+			wantFilter: query.CardFilter{
+				Last4: "1234", Brand: "visa", CardHolderName: "Ada", ExpMonth: 12, ExpYear: 2030,
+			},
+			wantLimit: 50, wantCursor: "xyz", reached: true,
+		},
+		{
+			name: "boundary values", target: base + "&expMonth=1&expYear=9999&limit=100", status: 200,
+			wantFilter: query.CardFilter{Last4: "1234", ExpMonth: 1, ExpYear: 9999}, wantLimit: 100, reached: true,
+		},
+		{
+			name: "holder name of 100 characters", target: base + "&cardHolderName=" + strings.Repeat("a", 100), status: 200,
+			wantFilter: query.CardFilter{Last4: "1234", CardHolderName: strings.Repeat("a", 100)}, wantLimit: 20, reached: true,
+		},
+		{
+			name: "invalid cursor", target: base + "&cursor=bad", err: domain.ErrInvalidCursor, status: 400,
+			want: invalid("invalid_cursor"), wantFilter: query.CardFilter{Last4: "1234"}, wantLimit: 20, wantCursor: "bad", reached: true,
+		},
+		{name: "non digit", target: "/cards:search?last4=12a4", status: 400, want: invalid("invalid_last4")},
+		{name: "too short", target: "/cards:search?last4=123", status: 400, want: invalid("invalid_last4")},
+		{name: "too long", target: "/cards:search?last4=12345", status: 400, want: invalid("invalid_last4")},
+		{name: "unknown brand", target: base + "&brand=maestro", status: 400, want: invalid("invalid_brand")},
+		{name: "blank holder name", target: base + "&cardHolderName=%20%20", status: 400, want: invalid("invalid_card_holder_name")},
+		{name: "empty holder name", target: base + "&cardHolderName=", status: 400, want: invalid("invalid_card_holder_name")},
+		{name: "holder name too long", target: base + "&cardHolderName=" + strings.Repeat("a", 101), status: 400, want: invalid("invalid_card_holder_name")},
+		{name: "expMonth 0", target: base + "&expMonth=0", status: 400, want: invalid("invalid_exp_month")},
+		{name: "expMonth 13", target: base + "&expMonth=13", status: 400, want: invalid("invalid_exp_month")},
+		{name: "expYear 0", target: base + "&expYear=0", status: 400, want: invalid("invalid_exp_year")},
+		{name: "expYear 10000", target: base + "&expYear=10000", status: 400, want: invalid("invalid_exp_year")},
+		{name: "limit 0", target: base + "&limit=0", status: 400, want: invalid("invalid_limit")},
+		{name: "limit 101", target: base + "&limit=101", status: 400, want: invalid("invalid_limit")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reader := &fakeReader{cards: tt.cards, card: query.Card{ID: "wrong"}}
+			reader := &fakeReader{page: tt.page, err: tt.err, card: query.Card{ID: "wrong"}}
 			rec := do(newHandler(&fakeRepo{}, reader), http.MethodGet, tt.target, "")
 
 			assertResponse(t, rec, tt.status, tt.want...)
-			if tt.reached && reader.gotLast4 != "1234" {
-				t.Errorf("last4 = %q, want 1234", reader.gotLast4)
-			}
 			if reader.gotID != "" {
 				t.Error("search was routed to get card")
 			}
-			if !tt.reached && reader.gotLast4 != "" {
-				t.Error("reader must not be reached")
+			if !tt.reached {
+				if reader.gotFilter != (query.CardFilter{}) || reader.gotLimit != 0 {
+					t.Error("reader must not be reached")
+				}
+				return
+			}
+			if reader.gotFilter != tt.wantFilter {
+				t.Errorf("filter = %+v, want %+v", reader.gotFilter, tt.wantFilter)
+			}
+			if reader.gotLimit != tt.wantLimit || reader.gotCursor != tt.wantCursor {
+				t.Errorf("reader args = (%d, %q), want (%d, %q)", reader.gotLimit, reader.gotCursor, tt.wantLimit, tt.wantCursor)
 			}
 		})
 	}
@@ -295,4 +345,16 @@ func TestGetHealth(t *testing.T) {
 	rec := do(newHandler(&fakeRepo{}, &fakeReader{}), http.MethodGet, "/health", "")
 
 	assertResponse(t, rec, http.StatusOK, `"status":"ok"`, `"instance":"pod-1"`)
+}
+
+func TestSearchCards_Last4IsRequired(t *testing.T) {
+	reader := &fakeReader{}
+	rec := do(newHandler(&fakeRepo{}, reader), http.MethodGet, "/cards:search?brand=visa", "")
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.Code)
+	}
+	if reader.gotLimit != 0 {
+		t.Error("reader must not be reached")
+	}
 }

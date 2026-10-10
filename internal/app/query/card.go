@@ -23,8 +23,16 @@ type CardPage struct {
 	NextCursor string
 }
 
+type CardFilter struct {
+	Last4          string
+	Brand          string
+	CardHolderName string
+	ExpMonth       int
+	ExpYear        int
+}
+
 type CardReader interface {
 	GetCard(ctx context.Context, id domain.CardID) (Card, error)
 	ListCards(ctx context.Context, limit int, cursor string) (CardPage, error)
-	SearchByLast4(ctx context.Context, last4 string) ([]Card, error)
+	SearchCards(ctx context.Context, filter CardFilter, limit int, cursor string) (CardPage, error)
 }

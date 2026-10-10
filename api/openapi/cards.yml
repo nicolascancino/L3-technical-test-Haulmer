@@ -76,19 +76,47 @@ paths:
   /cards:search:
     get:
       operationId: searchCards
-      summary: Search cards by the last 4 digits of the PAN
+      summary: Search cards by the last 4 digits of the PAN, with optional filters and cursor pagination
       parameters:
         - in: query
           name: last4
           required: true
           schema: { type: string }
+        - in: query
+          name: brand
+          required: false
+          schema:
+            type: string
+            enum: [visa, mastercard, amex, discover, diners, jcb, unknown]
+        - in: query
+          name: cardHolderName
+          required: false
+          description: Case-insensitive prefix of the card holder name
+          schema: { type: string }
+        - in: query
+          name: expMonth
+          required: false
+          schema: { type: integer }
+        - in: query
+          name: expYear
+          required: false
+          schema: { type: integer }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer }
+        - in: query
+          name: cursor
+          required: false
+          description: Opaque cursor returned as nextCursor by the previous page
+          schema: { type: string }
       responses:
         "200":
-          description: Matching cards
+          description: A page of matching cards
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CardList"
+                $ref: "#/components/schemas/CardPage"
         "400":
           $ref: "#/components/responses/BadRequest"
         "500":
@@ -156,13 +184,6 @@ components:
         expYear: { type: integer }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-    CardList:
-      type: object
-      required: [items]
-      properties:
-        items:
-          type: array
-          items: { $ref: "#/components/schemas/Card" }
     CardPage:
       type: object
       required: [items]

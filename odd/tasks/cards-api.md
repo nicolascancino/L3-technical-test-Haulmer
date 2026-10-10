@@ -66,11 +66,13 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
 
 ## Phase 3 — Persistence and wiring
 
-- [ ] **T06b Extend the card model (plan D10)**
+- [x] **T06b Extend the card model (plan D10)**
   Add `cardHolderName`, `brand`, `panHash` and `updatedAt` to `domain.Card`, `NewCard`, `UnmarshalCardFromDatabase` and getters; `detectBrand` as a signature-only function.
   Update `cards.yml` (request: `cardHolderName`; response: `cardHolderName`, `brand`, `updatedAt`; never `panHash`), regenerate, add the `PANHasher` port (plan D11) with a fake in tests, adapt `command.CreateCard` (computes `panHash`), `query` read model and `ports` mapping, with tests.
   Search (plan D13): add optional `brand`, `cardHolderName`, `expMonth`, `expYear`, `limit` and `cursor` to `cards:search` in the contract, regenerate, extend `query.SearchCards` and the `CardReader` signature, validate in `ports`, with tests.
-  Must land before T07 so the table is designed once. Commit: _pending_
+  Must land before T07 so the table is designed once.
+  Part 1 (model fields, `PANHasher`, contract fields): commit `0165f94`; reviewed, approved. Advisory for later: `UnmarshalCardFromDatabase` does not validate `brand`.
+  Part 2 (search filters and pagination): commit _see below_. Follow-up for T09: when building the generated handler, set `ErrorHandlerFunc` so wrapper errors (missing `last4`, non-integer `limit`) answer the JSON error style instead of `text/plain`.
 
 - [ ] **T07 Postgres schema and tables**
   `tables/` row structs with `gorm` tags, schema/migration for `cards` (`id` column of type `uuid`, plan D8), GORM dependency, `ErrNotFound`/`ErrDuplicate`, cursor encoding.

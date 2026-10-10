@@ -9,31 +9,64 @@ import (
 
 // Defines values for CardBrand.
 const (
-	Amex       CardBrand = "amex"
-	Diners     CardBrand = "diners"
-	Discover   CardBrand = "discover"
-	Jcb        CardBrand = "jcb"
-	Mastercard CardBrand = "mastercard"
-	Unknown    CardBrand = "unknown"
-	Visa       CardBrand = "visa"
+	CardBrandAmex       CardBrand = "amex"
+	CardBrandDiners     CardBrand = "diners"
+	CardBrandDiscover   CardBrand = "discover"
+	CardBrandJcb        CardBrand = "jcb"
+	CardBrandMastercard CardBrand = "mastercard"
+	CardBrandUnknown    CardBrand = "unknown"
+	CardBrandVisa       CardBrand = "visa"
 )
 
 // Valid indicates whether the value is a known member of the CardBrand enum.
 func (e CardBrand) Valid() bool {
 	switch e {
-	case Amex:
+	case CardBrandAmex:
 		return true
-	case Diners:
+	case CardBrandDiners:
 		return true
-	case Discover:
+	case CardBrandDiscover:
 		return true
-	case Jcb:
+	case CardBrandJcb:
 		return true
-	case Mastercard:
+	case CardBrandMastercard:
 		return true
-	case Unknown:
+	case CardBrandUnknown:
 		return true
-	case Visa:
+	case CardBrandVisa:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchCardsParamsBrand.
+const (
+	SearchCardsParamsBrandAmex       SearchCardsParamsBrand = "amex"
+	SearchCardsParamsBrandDiners     SearchCardsParamsBrand = "diners"
+	SearchCardsParamsBrandDiscover   SearchCardsParamsBrand = "discover"
+	SearchCardsParamsBrandJcb        SearchCardsParamsBrand = "jcb"
+	SearchCardsParamsBrandMastercard SearchCardsParamsBrand = "mastercard"
+	SearchCardsParamsBrandUnknown    SearchCardsParamsBrand = "unknown"
+	SearchCardsParamsBrandVisa       SearchCardsParamsBrand = "visa"
+)
+
+// Valid indicates whether the value is a known member of the SearchCardsParamsBrand enum.
+func (e SearchCardsParamsBrand) Valid() bool {
+	switch e {
+	case SearchCardsParamsBrandAmex:
+		return true
+	case SearchCardsParamsBrandDiners:
+		return true
+	case SearchCardsParamsBrandDiscover:
+		return true
+	case SearchCardsParamsBrandJcb:
+		return true
+	case SearchCardsParamsBrandMastercard:
+		return true
+	case SearchCardsParamsBrandUnknown:
+		return true
+	case SearchCardsParamsBrandVisa:
 		return true
 	default:
 		return false
@@ -54,11 +87,6 @@ type Card struct {
 
 // CardBrand defines model for Card.Brand.
 type CardBrand string
-
-// CardList defines model for CardList.
-type CardList struct {
-	Items []Card `json:"items"`
-}
 
 // CardPage defines model for CardPage.
 type CardPage struct {
@@ -116,8 +144,21 @@ type ListCardsParams struct {
 
 // SearchCardsParams defines parameters for SearchCards.
 type SearchCardsParams struct {
-	Last4 string `form:"last4" json:"last4"`
+	Last4 string                  `form:"last4" json:"last4"`
+	Brand *SearchCardsParamsBrand `form:"brand,omitempty" json:"brand,omitempty"`
+
+	// CardHolderName Case-insensitive prefix of the card holder name
+	CardHolderName *string `form:"cardHolderName,omitempty" json:"cardHolderName,omitempty"`
+	ExpMonth       *int    `form:"expMonth,omitempty" json:"expMonth,omitempty"`
+	ExpYear        *int    `form:"expYear,omitempty" json:"expYear,omitempty"`
+	Limit          *int    `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque cursor returned as nextCursor by the previous page
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
+
+// SearchCardsParamsBrand defines parameters for SearchCards.
+type SearchCardsParamsBrand string
 
 // CreateCardJSONRequestBody defines body for CreateCard for application/json ContentType.
 type CreateCardJSONRequestBody = CreateCardRequest

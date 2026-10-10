@@ -3,7 +3,9 @@ package query
 import "context"
 
 type SearchCards struct {
-	Last4 string
+	CardFilter
+	Limit  int
+	Cursor string
 }
 
 type SearchCardsHandler struct {
@@ -17,6 +19,6 @@ func NewSearchCardsHandler(reader CardReader) SearchCardsHandler {
 	return SearchCardsHandler{reader: reader}
 }
 
-func (h SearchCardsHandler) Handle(ctx context.Context, q SearchCards) ([]Card, error) {
-	return h.reader.SearchByLast4(ctx, q.Last4)
+func (h SearchCardsHandler) Handle(ctx context.Context, q SearchCards) (CardPage, error) {
+	return h.reader.SearchCards(ctx, q.CardFilter, q.Limit, q.Cursor)
 }

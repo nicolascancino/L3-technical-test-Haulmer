@@ -12,15 +12,14 @@ import (
 )
 
 type fakeReader struct {
-	card  query.Card
-	page  query.CardPage
-	cards []query.Card
-	err   error
+	card query.Card
+	page query.CardPage
+	err  error
 
 	gotID     domain.CardID
 	gotLimit  int
 	gotCursor string
-	gotLast4  string
+	gotFilter query.CardFilter
 }
 
 func (r *fakeReader) GetCard(_ context.Context, id domain.CardID) (query.Card, error) {
@@ -33,9 +32,9 @@ func (r *fakeReader) ListCards(_ context.Context, limit int, cursor string) (que
 	return r.page, r.err
 }
 
-func (r *fakeReader) SearchByLast4(_ context.Context, last4 string) ([]query.Card, error) {
-	r.gotLast4 = last4
-	return r.cards, r.err
+func (r *fakeReader) SearchCards(_ context.Context, filter query.CardFilter, limit int, cursor string) (query.CardPage, error) {
+	r.gotFilter, r.gotLimit, r.gotCursor = filter, limit, cursor
+	return r.page, r.err
 }
 
 var sample = query.Card{
@@ -108,28 +107,33 @@ func TestListCardsHandler_Handle(t *testing.T) {
 
 func TestSearchCardsHandler_Handle(t *testing.T) {
 	boom := errors.New("boom")
+	filter := query.CardFilter{Last4: "1111", Brand: "visa", CardHolderName: "ada", ExpMonth: 12, ExpYear: 2030}
 	tests := []struct {
 		name    string
 		err     error
-		cards   []query.Card
+		page    query.CardPage
 		wantErr error
 	}{
-		{name: "delegates to the reader", cards: []query.Card{sample}},
+		{name: "delegates to the reader", page: query.CardPage{Items: []query.Card{sample}, NextCursor: "next"}},
 		{name: "propagates reader error", err: boom, wantErr: boom},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reader := &fakeReader{cards: tt.cards, err: tt.err}
-			got, err := query.NewSearchCardsHandler(reader).Handle(context.Background(), query.SearchCards{Last4: "1111"})
+			reader := &fakeReader{page: tt.page, err: tt.err}
+			got, err := query.NewSearchCardsHandler(reader).Handle(
+				context.Background(), query.SearchCards{CardFilter: filter, Limit: 10, Cursor: "abc"})
 
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", err, tt.wantErr)
 			}
-			if reader.gotLast4 != "1111" {
-				t.Errorf("last4 = %q, want 1111", reader.gotLast4)
+			if reader.gotFilter != filter {
+				t.Errorf("filter = %+v, want %+v", reader.gotFilter, filter)
 			}
-			if !reflect.DeepEqual(got, tt.cards) {
-				t.Errorf("cards = %+v, want %+v", got, tt.cards)
+			if reader.gotLimit != 10 || reader.gotCursor != "abc" {
+				t.Errorf("args = (%d, %q), want (10, abc)", reader.gotLimit, reader.gotCursor)
+			}
+			if !reflect.DeepEqual(got, tt.page) {
+				t.Errorf("page = %+v, want %+v", got, tt.page)
 			}
 		})
 	}

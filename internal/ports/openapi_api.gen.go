@@ -23,7 +23,7 @@ type ServerInterface interface {
 	// GetCard Get a card by id
 	// (GET /cards/{id})
 	GetCard(w http.ResponseWriter, r *http.Request, id string)
-	// SearchCards Search cards by the last 4 digits of the PAN
+	// SearchCards Search cards by the last 4 digits of the PAN, with optional filters and cursor pagination
 	// (GET /cards:search)
 	SearchCards(w http.ResponseWriter, r *http.Request, params SearchCardsParams)
 	// GetHealth Liveness check that identifies the serving instance
@@ -53,7 +53,7 @@ func (_ Unimplemented) GetCard(w http.ResponseWriter, r *http.Request, id string
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// SearchCards Search cards by the last 4 digits of the PAN
+// SearchCards Search cards by the last 4 digits of the PAN, with optional filters and cursor pagination
 // (GET /cards:search)
 func (_ Unimplemented) SearchCards(w http.ResponseWriter, r *http.Request, params SearchCardsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -178,6 +178,84 @@ func (siw *ServerInterfaceWrapper) SearchCards(w http.ResponseWriter, r *http.Re
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "last4"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "last4", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "brand" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "brand", r.URL.Query(), &params.Brand, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "brand"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "brand", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cardHolderName" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cardHolderName", r.URL.Query(), &params.CardHolderName, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cardHolderName"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cardHolderName", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "expMonth" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "expMonth", r.URL.Query(), &params.ExpMonth, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expMonth"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expMonth", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "expYear" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "expYear", r.URL.Query(), &params.ExpYear, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expYear"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expYear", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
 		}
 		return
 	}
