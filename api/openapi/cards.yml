@@ -201,7 +201,7 @@ components:
         status: { type: string }
         instance:
           type: string
-          description: Identifies the instance that served the request (hostname or pod name)
+          description: Identifies the instance that served the request (hostname or instance name)
     Error:
       type: object
       required: [slug, message]

@@ -20,7 +20,7 @@ Open points to carry into the next tasks:
 - T07/T08: the reader returns `domain.ErrInvalidCursor` for a bad cursor and `domain.ErrCardNotFound` for an id that is not a valid UUID (plan D8).
 - T09: resolve `/health` instance from `POD_NAME`, falling back to the hostname; set `ErrorHandlerFunc` on the generated handler so wrapper errors use the JSON error style.
 - Review advisories not yet handled: `POST /cards` accepts trailing data after the JSON body; `last4` is not checked as digits in `NewCard`/`UnmarshalCardFromDatabase`; `UnmarshalCardFromDatabase` does not validate `createdAt` or `brand`; domain tests have weak assertions; `app.Application` can be built with zero-value handlers.
-- Deferred phases (not in this list): Luhn and expiry implementation, secure PAN storage (human is researching), idempotency, Secrets Manager, CloudWatch, Dockerfile, Kubernetes, AWS deployment.
+- Deferred phases (not in this list): Luhn and expiry implementation, secure PAN storage (human is researching), idempotency, Secrets Manager, CloudWatch, Dockerfile, ECS Fargate, AWS deployment.
 
 Workflow reminders: generate API code with `./scripts/openapi-http.sh cards internal/ports ports` (no `make`); review one task by starting with `baseRef` set to the full sha of the previous commit; the review lens models live in `~/.pi/gentle-ai/models.json`; a candidate with a shell script is high risk and needs 4 reviewer runs, so ask first.
 
@@ -112,4 +112,4 @@ Optional improvements to review at the end of the project live in [`odd/requirem
 - Luhn and expiry implementation (+ domain tests)
 - Secure PAN storage
 - AWS Secrets Manager, CloudWatch
-- Dockerfile, Kubernetes manifests, AWS deployment
+- Dockerfile, ECS Fargate task definition and service, AWS deployment

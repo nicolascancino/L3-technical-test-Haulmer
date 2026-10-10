@@ -26,7 +26,7 @@ Explicitly deferred (separate phases, decided later):
 - Secure PAN storage (encryption / tokenization). Under research by the human.
 - Idempotency via `Idempotency-Key` (section 5 and D3 are a draft only; nothing is built in this phase).
 - AWS Secrets Manager (credentials), CloudWatch (observability).
-- Dockerfile, Kubernetes manifests, deployment on AWS.
+- Dockerfile, ECS Fargate task definition and service, deployment on AWS.
 
 ## 3. Architecture
 
@@ -76,7 +76,7 @@ Dependency rule: `domain` imports nothing internal; `app` -> `domain`; `ports` -
 | D4 | Luhn and expiry validation live in `domain/card.go`, enforced by `NewCard` | Business rules belong to the entity; no entry point can create an invalid card |
 | D5 | API, domain and persistence models are separate | Avoid leaking DB/PAN data through the API |
 | D6 | The domain never calls `time.Now()`: `NewCardConfig` receives `CreatedAt`, so domain rules stay deterministic in tests. `command.CreateCard` reads the clock directly with `time.Now().UTC()`, with no injected clock | Testability of the rules without extra types (AGENTS.md, Simplicity). Handler tests only check that `createdAt` is close to now |
-| D7 | `/health` returns instance identity (`POD_NAME` if set, hostname otherwise) | Lets operators tell replicas apart behind the load balancer; useful behind a k8s Service |
+| D7 | `/health` returns instance identity (`POD_NAME` if set, hostname otherwise) | Lets operators tell replicas apart behind the load balancer; useful behind an ECS service or a load balancer; `POD_NAME` is optional and the hostname (the task or container id on ECS Fargate) is the normal source |
 | D8 | Card ids are UUIDv7, generated in `command.CreateCard` with `uuid.NewV7()` from `google/uuid`, not injected; `domain.CardID` stays a string and the column type is `uuid` | Time-ordered ids keep the Postgres primary key index compact and make cursor pagination simple. Handler tests check the id parses as a UUID version 7. An id that is not a valid UUID is reported as not found by the repository adapter |
 | D9 | Constructors of app handlers keep panicking on nil dependencies | Human decision for now: failing at startup is intended; revisit returning `(T, error)` later |
 | D10 | `Card` also carries `cardHolderName`, `brand`, `panHash` and `updatedAt`. `brand` is derived from the PAN inside the domain; `panHash` is computed outside the domain and received as an opaque string; `updatedAt` equals `createdAt` on creation and is injected like every other timestamp | Human decision. The domain must not know the hashing algorithm or its salt (those belong to secure PAN storage); `panHash` and the PAN never appear in API responses |

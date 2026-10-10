@@ -114,7 +114,7 @@ type Error struct {
 
 // Health defines model for Health.
 type Health struct {
-	// Instance Identifies the instance that served the request (hostname or pod name)
+	// Instance Identifies the instance that served the request (hostname or instance name)
 	Instance string `json:"instance"`
 	Status   string `json:"status"`
 }
