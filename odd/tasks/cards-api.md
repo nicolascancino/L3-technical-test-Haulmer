@@ -13,10 +13,11 @@ Check a box only after the outcome and its checks were observed. Record the comm
   Check: `go build ./...` and `go vet ./...` pass (observed). Commit: `cc61fa5`.
   Note: DB library = GORM (human decision, see plan D2; dependency added in T07); `make` is not installed on this Windows machine, run the `go` commands directly.
 
-- [ ] **T02 Domain model and ports (signatures only)**
+- [x] **T02 Domain model and ports (signatures only)**
   `Card` entity in `card.go` (private fields, `NewCard`, `UnmarshalCardFromDatabase`, getters) with `validatePAN` (Luhn) and
   `validateExpiry` as signatures without logic, called from `NewCard`, domain errors, `CardRepository` interface.
-  Check: compiles; `domain` imports nothing internal or infrastructure. Commit: _pending_
+  Check: `go build`, `go vet`, `go test ./internal/domain` pass; `domain` imports only `context`, `errors`, `time` (observed). Commit: `149b901`.
+  Decisions: `Card` keeps `last4`, `expMonth`, `expYear` and does not retain the full PAN (storage pending). Listing and `last4` search are read models, defined in `app/query` (T05), not in `CardRepository`. The stubs accept any value until the deferred Luhn/expiry phase.
 
 - [ ] **T03 OpenAPI contract**
   `api/openapi/cards.yml` with the 5 operations, `Error` schema, pagination and masked card schemas.
