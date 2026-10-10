@@ -1,0 +1,176 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Cards API
+  description: Create and query credit cards. Responses never include the full PAN.
+paths:
+  /cards:
+    post:
+      operationId: createCard
+      summary: Create a card
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCardRequest"
+      responses:
+        "201":
+          description: Card created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    get:
+      operationId: listCards
+      summary: List cards with cursor pagination
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer }
+        - in: query
+          name: cursor
+          required: false
+          description: Opaque cursor returned as nextCursor by the previous page
+          schema: { type: string }
+      responses:
+        "200":
+          description: A page of cards
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /cards/{id}:
+    get:
+      operationId: getCard
+      summary: Get a card by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The card
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /cards:search:
+    get:
+      operationId: searchCards
+      summary: Search cards by the last 4 digits of the PAN
+      parameters:
+        - in: query
+          name: last4
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Matching cards
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness check that identifies the serving instance
+      responses:
+        "200":
+          description: The service is up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+components:
+  responses:
+    BadRequest:
+      description: Malformed request (invalid JSON or invalid parameter)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    UnprocessableEntity:
+      description: Well-formed request that violates a business rule (invalid PAN, expired card)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Card not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    InternalError:
+      description: Unexpected error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    CreateCardRequest:
+      type: object
+      required: [pan, expMonth, expYear]
+      properties:
+        pan:
+          type: string
+          description: Full card number. Accepted on creation only and never returned.
+        expMonth: { type: integer }
+        expYear: { type: integer }
+    Card:
+      type: object
+      required: [id, last4, expMonth, expYear, createdAt]
+      properties:
+        id: { type: string }
+        last4: { type: string }
+        expMonth: { type: integer }
+        expYear: { type: integer }
+        createdAt: { type: string, format: date-time }
+    CardList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Card" }
+    CardPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Card" }
+        nextCursor:
+          type: string
+          description: Absent on the last page
+    Health:
+      type: object
+      required: [status, instance]
+      properties:
+        status: { type: string }
+        instance:
+          type: string
+          description: Identifies the instance that served the request (hostname or pod name)
+    Error:
+      type: object
+      required: [slug, message]
+      properties:
+        slug: { type: string }
+        message: { type: string }
