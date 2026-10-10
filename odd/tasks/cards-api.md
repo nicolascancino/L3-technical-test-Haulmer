@@ -1,0 +1,65 @@
+# Tasks: cards-api
+
+Plan: [`odd/plans/cards-api.md`](../plans/cards-api.md)
+
+Rules: one task = one reviewable work unit = at least one Conventional Commit on a feature branch.
+Check a box only after the outcome and its checks were observed. Record the commit hash as evidence.
+
+## Phase 1 — Skeleton
+
+- [ ] **T01 Bootstrap project**
+  `go.mod` (module `github.com/nicolascancino/L3-technical-test-Haulmer-`), remove invalid `internal/A.go`,
+  create layer folders, `Makefile`, `.gitignore` additions, pin `oapi-codegen` as a Go tool, confirm DB library.
+  Check: `go build ./...` and `go vet ./...` pass. Commit: _pending_
+
+- [ ] **T02 Domain model and ports (signatures only)**
+  `Card` entity in `card.go` (private fields, `NewCard`, `UnmarshalCardFromDatabase`, getters) with `validatePAN` (Luhn) and
+  `validateExpiry` as signatures without logic, called from `NewCard`, domain errors, `CardRepository` interface.
+  Check: compiles; `domain` imports nothing internal or infrastructure. Commit: _pending_
+
+- [ ] **T03 OpenAPI contract**
+  `api/openapi/cards.yml` with the 5 operations, `Error` schema, pagination and masked card schemas.
+  Check: contract validates. Commit: _pending_
+
+- [ ] **T04 Code generation**
+  `scripts/openapi-http.sh`, `make openapi_http`, commit generated `internal/ports/*.gen.go`.
+  Check: generation is reproducible; `/cards:search` and `/cards/{id}` both generate. Commit: _pending_
+
+## Phase 2 — Application and ports
+
+- [ ] **T05 Application layer**
+  `app.Application`, `command.CreateCard`, `query.GetCard`, `ListCards`, `SearchCards`.
+  Unit tests with in-memory fakes. Commit: _pending_
+
+- [ ] **T06 HTTP port**
+  `HttpServer` implementing `ServerInterface`, domain-error -> status mapping, `/health` with instance identity.
+  Tests with `httptest` against fake `app` handlers. Commit: _pending_
+
+## Phase 3 — Persistence and wiring
+
+- [ ] **T07 Postgres schema and tables**
+  `tables/` row structs, schema/migration for `cards`, `ErrNotFound`/`ErrDuplicate`, cursor encoding.
+  Commit: _pending_
+
+- [ ] **T08 Postgres repositories**
+  `CardRepository` implementation. Integration tests (build tag `integration`):
+  round-trip, duplicate, not-found, rollback.
+  Commit: _pending_
+
+- [ ] **T09 Composition root and entry point**
+  `service/application.go`, `cmd/api/main.go`, configuration from environment, graceful shutdown.
+  Check: service starts against a local Postgres and answers `/health`. Commit: _pending_
+
+## Phase 4 — Delivery of this stage
+
+- [ ] **T10 Developer docs**
+  `README.md`: how to run, architecture summary, endpoints, deferred items, how AI was used (link to `odd/`).
+  Commit: _pending_
+
+## Deferred (separate phases, not part of this list)
+
+- Idempotency (`Idempotency-Key`, same Postgres DB; draft in plan section 5)
+- Luhn and expiry implementation (+ domain tests)
+- Secure PAN storage
+- AWS Secrets Manager, CloudWatch
+- Dockerfile, Kubernetes manifests, AWS deployment
