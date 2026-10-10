@@ -31,9 +31,11 @@ Check a box only after the outcome and its checks were observed. Record the comm
 
 ## Phase 2 — Application and ports
 
-- [ ] **T05 Application layer**
+- [x] **T05 Application layer**
   `app.Application`, `command.CreateCard`, `query.GetCard`, `ListCards`, `SearchCards`.
-  Unit tests with in-memory fakes. Commit: _pending_
+  Unit tests with in-memory fakes. Commit: `58d39b0`.
+  Check: writer observed RED then GREEN; parent re-ran `gofmt`, `go build`, `go vet`, `go test -count=1 ./...` and verified `app` imports only `command`/`query`, which import only `domain` (observed).
+  Decisions: `CreateCard` validates through the domain and discards the PAN (secure storage pending). Queries use their own `CardReader` read model in `app/query`. `limit` bounds and `last4` format are enforced in `ports/` (T06), handlers only delegate. Cursor encoding belongs to the reader (T07).
 
 - [ ] **T06 HTTP port**
   `HttpServer` implementing `ServerInterface`, domain-error -> status mapping, `/health` with instance identity.
