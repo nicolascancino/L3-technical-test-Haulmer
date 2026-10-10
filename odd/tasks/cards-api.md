@@ -84,19 +84,19 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Decisions: schema is one embedded `schema.sql` applied with `tables.Migrate` (no migration tool). `pan_hash` is `UNIQUE`, so a repeated PAN is rejected even with another expiry. Indexes: `(last4, id)` and `lower(card_holder_name) text_pattern_ops`. Cursor is the id of the last row of the page; pages are ordered by `id` (UUIDv7, plan D8), human-approved over `(created_at, id)`. Mapping and cursor live in `repository` (not `tables`, which must not import `domain`).
   Gap: `gorm.io/driver/postgres` is not in `go.mod` yet (`go mod tidy` drops it until imported); T08 adds it when it opens the connection.
 
-- [ ] **T08 Postgres repositories**
+- [x] **T08 Postgres repositories**
   `CardRepository` implementation. Integration tests (build tag `integration`):
   round-trip, duplicate, not-found, rollback.
-  Commit: `5e6fe48` (code and integration tests written, box stays open).
-  Pending: run `go test -tags integration ./internal/adapters/repository/` with Docker up; the SQL was never executed against Postgres. Unit and `go vet -tags integration` are green.
+  Commit: `5e6fe48`. Check: `go test -tags integration ./internal/adapters/repository/` passed against a postgres:16 container (observed 2026-10-10).
   Note: the connection must use `gorm.Config{TranslateError: true}` (wired in T09). Added `gorm.io/driver/postgres` and `testcontainers-go`.
 
-- [ ] **T09 Composition root and entry point**
+- [x] **T09 Composition root and entry point**
   `service/application.go`, `cmd/api/main.go`, `internal/config` (plan D12), HMAC `PANHasher` adapter, Secrets Manager client, graceful shutdown.
   Check: service starts against a local Postgres and answers `/health`.
-  Commits: `a52b17f` (config, hasher, secrets), `1cf833f` (service, main). Box stays open.
+  Commits: `a52b17f` (config, hasher, secrets), `1cf833f` (service, main), `315da92` (APP_ENV).
   Observed: `gofmt`, `go build`, `go vet`, `go vet -tags integration`, `go test -count=1 ./...` green; writer saw RED then GREEN for config, hasher, secrets fallback and the JSON error handler.
-  Pending: start the server against Postgres and call `/health`; the AWS Secrets Manager path was never exercised.
+  Observed (2026-10-10, APP_ENV=local, postgres:16): the service started, `/health` answered 200, create, list, search and an invalid cursor behaved as expected. Not exercised: the `cloud` path against real AWS Secrets Manager.
+  Findings to fix: duplicate PAN answers 500 (needs 409); GORM logs failed INSERTs, including `pan_hash`, outside slog; list returns timestamps in the local zone while create returns UTC.
   Refactor (plan D12): `APP_ENV` (`local`|`cloud`, required, no default) replaces the implicit secret-source detection; `secrets.Resolve` removed. `cloud` is fail-closed: an unreadable or blank secret stops startup before the port opens. Env vars: `APP_ENV` (required), `PORT`, `POD_NAME`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_SSLMODE` (default `require`); `local`: `DB_PASSWORD`, `PAN_SALT`; `cloud`: `AWS_REGION`, `DB_PASSWORD_SECRET_ID`, `PAN_SALT_SECRET_ID`.
 
 ## Phase 4 — Delivery of this stage
