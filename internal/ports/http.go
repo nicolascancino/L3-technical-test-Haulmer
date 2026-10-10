@@ -235,3 +235,12 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 		slog.Error("encode response", "error", err)
 	}
 }
+
+// NewHandler builds the chi router; wrapper errors (bad query parameters) answer in the JSON error style.
+func NewHandler(application app.Application, instance string) http.Handler {
+	return HandlerWithOptions(NewHttpServer(application, instance), ChiServerOptions{
+		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
+			writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		},
+	})
+}

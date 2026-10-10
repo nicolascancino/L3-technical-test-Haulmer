@@ -2,6 +2,7 @@ package ports_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -351,5 +352,25 @@ func TestSearchCards_Last4IsRequired(t *testing.T) {
 	}
 	if reader.gotLimit != 0 {
 		t.Error("reader must not be reached")
+	}
+}
+
+func TestNewHandler_WrapperErrorsAreJSON(t *testing.T) {
+	handler := ports.NewHandler(app.Application{}, "test")
+
+	for _, target := range []string{"/cards:search", "/cards?limit=abc"} {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", target, rec.Code)
+		}
+		if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+			t.Errorf("%s: content type = %q, want application/json", target, ct)
+		}
+		var body ports.Error
+		if err := json.NewDecoder(rec.Body).Decode(&body); err != nil || body.Slug != "invalid_request" {
+			t.Errorf("%s: body = %+v, err = %v", target, body, err)
+		}
 	}
 }
