@@ -1,4 +1,4 @@
-.PHONY: build test vet
+.PHONY: build test vet openapi_http
 
 build:
 	go build ./...
@@ -8,3 +8,6 @@ test:
 
 vet:
 	go vet ./...
+
+openapi_http:
+	@./scripts/openapi-http.sh cards internal/ports ports
