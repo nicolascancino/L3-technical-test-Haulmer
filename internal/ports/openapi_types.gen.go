@@ -122,6 +122,9 @@ type Health struct {
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
 
+// Conflict defines model for Conflict.
+type Conflict = Error
+
 // InternalError defines model for InternalError.
 type InternalError = Error
 

@@ -60,7 +60,7 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   `HttpServer` implementing `ServerInterface`, domain-error -> status mapping, `/health` with instance identity.
   Tests with `httptest` against fake `app` handlers. Commit: `43194b7`.
   Check: writer observed RED then GREEN; parent re-ran `gofmt`, `go build`, `go vet`, `go test -count=1 ./...` and read `http.go` (observed). `ports` imports only `app`, `command`, `query`, `domain`.
-  Decisions: `limit` 1..100 (default 20) and `last4` format enforced here; `400` for invalid json/limit/last4/cursor, `422` for invalid PAN/expiry/expired card, `404` unknown card, unmapped errors become `500` with a fixed message and are logged. `ErrCardAlreadyExists` stays unmapped (ids are server-generated). Added `domain.ErrInvalidCursor`. Routing for `/cards:search` vs `/cards/{id}` is now a permanent test.
+  Decisions: `limit` 1..100 (default 20) and `last4` format enforced here; `400` for invalid json/limit/last4/cursor, `422` for invalid PAN/expiry/expired card, `404` unknown card, unmapped errors become `500` with a fixed message and are logged. `ErrCardAlreadyExists` was left unmapped under the assumption that ids are server-generated; it now answers `409` with slug `card_already_exists` (the unique `pan_hash` can reject a repeated PAN, see T07 and T09). Added `domain.ErrInvalidCursor`. Routing for `/cards:search` vs `/cards/{id}` is now a permanent test.
   Known limit: `invalid_expiry` and `card_expired` are tested by injecting the errors through the fake repository, because `validateExpiry` is still a stub.
   Follow-up `7dd8d1d`: a body over 1 MiB now answers `413 payload_too_large` (declared in the contract, regenerated, tested RED then GREEN).
 
@@ -96,7 +96,8 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Commits: `a52b17f` (config, hasher, secrets), `1cf833f` (service, main), `315da92` (APP_ENV).
   Observed: `gofmt`, `go build`, `go vet`, `go vet -tags integration`, `go test -count=1 ./...` green; writer saw RED then GREEN for config, hasher, secrets fallback and the JSON error handler.
   Observed (2026-10-10, APP_ENV=local, postgres:16): the service started, `/health` answered 200, create, list, search and an invalid cursor behaved as expected. Not exercised: the `cloud` path against real AWS Secrets Manager.
-  Findings to fix: duplicate PAN answers 500 (needs 409); GORM logs failed INSERTs, including `pan_hash`, outside slog; list returns timestamps in the local zone while create returns UTC.
+  Fixed: the duplicate-PAN 500 now answers `409` `card_already_exists` (`feat(ports): answer 409 for a duplicate card`).
+  Findings to fix: GORM logs failed INSERTs, including `pan_hash`, outside slog; list returns timestamps in the local zone while create returns UTC.
   Refactor (plan D12): `APP_ENV` (`local`|`cloud`, required, no default) replaces the implicit secret-source detection; `secrets.Resolve` removed. `cloud` is fail-closed: an unreadable or blank secret stops startup before the port opens. Env vars: `APP_ENV` (required), `PORT`, `POD_NAME`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_SSLMODE` (default `require`); `local`: `DB_PASSWORD`, `PAN_SALT`; `cloud`: `AWS_REGION`, `DB_PASSWORD_SECRET_ID`, `PAN_SALT_SECRET_ID`.
 
 ## Phase 4 — Delivery of this stage

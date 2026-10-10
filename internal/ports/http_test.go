@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -153,6 +154,13 @@ func TestCreateCard(t *testing.T) {
 			want:   []string{`"slug":"card_expired"`},
 		},
 		{
+			name:   "duplicate card",
+			body:   `{"pan":"` + validPAN + `","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099}`,
+			repo:   fmt.Errorf("%w: 0190-secret-card-id", domain.ErrCardAlreadyExists),
+			status: http.StatusConflict,
+			want:   []string{`"slug":"card_already_exists"`, `"message":"card already exists"`},
+		},
+		{
 			name:   "unexpected repository failure",
 			body:   `{"pan":"` + validPAN + `","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099}`,
 			repo:   boom,
@@ -170,6 +178,9 @@ func TestCreateCard(t *testing.T) {
 			}
 			if strings.Contains(rec.Body.String(), "secret-hash") {
 				t.Error("response leaks the PAN hash")
+			}
+			if strings.Contains(rec.Body.String(), "secret-card-id") {
+				t.Error("response leaks the card id")
 			}
 			if strings.Contains(rec.Body.String(), "secret-host") {
 				t.Error("response leaks the raw error")

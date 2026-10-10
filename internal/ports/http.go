@@ -216,6 +216,8 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusUnprocessableEntity, "card_expired", domain.ErrCardExpired.Error())
 	case errors.Is(err, domain.ErrCardNotFound):
 		writeError(w, http.StatusNotFound, "card_not_found", domain.ErrCardNotFound.Error())
+	case errors.Is(err, domain.ErrCardAlreadyExists):
+		writeError(w, http.StatusConflict, "card_already_exists", domain.ErrCardAlreadyExists.Error())
 	case errors.Is(err, domain.ErrInvalidCursor):
 		writeError(w, http.StatusBadRequest, "invalid_cursor", domain.ErrInvalidCursor.Error())
 	default:

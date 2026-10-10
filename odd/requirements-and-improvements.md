@@ -39,7 +39,7 @@ The plan ([`plans/cards-api.md`](plans/cards-api.md)) holds the decisions; this 
 
 Creation and data model:
 
-- **C1** Unique constraint on `panHash` and `409 Conflict` for a duplicate card (today `ErrCardAlreadyExists` is not mapped).
+- **C1** Unique constraint on `panHash` and `409 Conflict` for a duplicate card (done: `ErrCardAlreadyExists` answers `409` `card_already_exists`).
 - **C2** Optional: an update operation (`PATCH /cards/{id}`). Until then there is no endpoint and `updatedAt` is an audit field, equal to `createdAt` on creation.
 - **C3** Validation of `cardHolderName` (length, allowed characters) and of `last4` as digits.
 - **C4** Reject trailing data after the JSON body on `POST /cards`.
