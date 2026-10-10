@@ -8,11 +8,14 @@ import (
 )
 
 type Card struct {
-	ID        string
-	Last4     string
-	ExpMonth  int
-	ExpYear   int
-	CreatedAt time.Time
+	ID             string
+	Last4          string
+	ExpMonth       int
+	ExpYear        int
+	CardHolderName string
+	Brand          string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type CardPage struct {

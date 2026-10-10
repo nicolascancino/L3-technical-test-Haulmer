@@ -39,11 +39,14 @@ func (r *fakeReader) SearchByLast4(_ context.Context, last4 string) ([]query.Car
 }
 
 var sample = query.Card{
-	ID:        "card-1",
-	Last4:     "1111",
-	ExpMonth:  12,
-	ExpYear:   2030,
-	CreatedAt: time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
+	ID:             "card-1",
+	Last4:          "1111",
+	ExpMonth:       12,
+	ExpYear:        2030,
+	CreatedAt:      time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
+	CardHolderName: "Ada Lovelace",
+	Brand:          "visa",
+	UpdatedAt:      time.Date(2026, 1, 16, 10, 0, 0, 0, time.UTC),
 }
 
 func TestGetCardHandler_Handle(t *testing.T) {

@@ -7,14 +7,53 @@ import (
 	"time"
 )
 
+// Defines values for CardBrand.
+const (
+	Amex       CardBrand = "amex"
+	Diners     CardBrand = "diners"
+	Discover   CardBrand = "discover"
+	Jcb        CardBrand = "jcb"
+	Mastercard CardBrand = "mastercard"
+	Unknown    CardBrand = "unknown"
+	Visa       CardBrand = "visa"
+)
+
+// Valid indicates whether the value is a known member of the CardBrand enum.
+func (e CardBrand) Valid() bool {
+	switch e {
+	case Amex:
+		return true
+	case Diners:
+		return true
+	case Discover:
+		return true
+	case Jcb:
+		return true
+	case Mastercard:
+		return true
+	case Unknown:
+		return true
+	case Visa:
+		return true
+	default:
+		return false
+	}
+}
+
 // Card defines model for Card.
 type Card struct {
-	CreatedAt time.Time `json:"createdAt"`
-	ExpMonth  int       `json:"expMonth"`
-	ExpYear   int       `json:"expYear"`
-	Id        string    `json:"id"`
-	Last4     string    `json:"last4"`
+	Brand          CardBrand `json:"brand"`
+	CardHolderName string    `json:"cardHolderName"`
+	CreatedAt      time.Time `json:"createdAt"`
+	ExpMonth       int       `json:"expMonth"`
+	ExpYear        int       `json:"expYear"`
+	Id             string    `json:"id"`
+	Last4          string    `json:"last4"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }
+
+// CardBrand defines model for Card.Brand.
+type CardBrand string
 
 // CardList defines model for CardList.
 type CardList struct {
@@ -31,8 +70,9 @@ type CardPage struct {
 
 // CreateCardRequest defines model for CreateCardRequest.
 type CreateCardRequest struct {
-	ExpMonth int `json:"expMonth"`
-	ExpYear  int `json:"expYear"`
+	CardHolderName string `json:"cardHolderName"`
+	ExpMonth       int    `json:"expMonth"`
+	ExpYear        int    `json:"expYear"`
 
 	// Pan Full card number. Accepted on creation only and never returned.
 	Pan string `json:"pan"`

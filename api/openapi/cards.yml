@@ -117,7 +117,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     UnprocessableEntity:
-      description: Well-formed request that violates a business rule (invalid PAN, expired card)
+      description: Well-formed request that violates a business rule (invalid PAN, missing card holder name, expired card)
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -134,22 +134,28 @@ components:
   schemas:
     CreateCardRequest:
       type: object
-      required: [pan, expMonth, expYear]
+      required: [pan, cardHolderName, expMonth, expYear]
       properties:
         pan:
           type: string
           description: Full card number. Accepted on creation only and never returned.
+        cardHolderName: { type: string }
         expMonth: { type: integer }
         expYear: { type: integer }
     Card:
       type: object
-      required: [id, last4, expMonth, expYear, createdAt]
+      required: [id, last4, expMonth, expYear, cardHolderName, brand, createdAt, updatedAt]
       properties:
         id: { type: string }
         last4: { type: string }
+        cardHolderName: { type: string }
+        brand:
+          type: string
+          enum: [visa, mastercard, amex, discover, diners, jcb, unknown]
         expMonth: { type: integer }
         expYear: { type: integer }
         createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     CardList:
       type: object
       required: [items]

@@ -57,13 +57,21 @@ func (r *fakeReader) SearchByLast4(_ context.Context, last4 string) ([]query.Car
 	return r.cards, r.err
 }
 
-var sampleCard = query.Card{ID: "card-1", Last4: "1111", ExpMonth: 12, ExpYear: 2099, CreatedAt: createdAt}
+var sampleCard = query.Card{
+	ID: "card-1", Last4: "1111", ExpMonth: 12, ExpYear: 2099, CardHolderName: "Ada Lovelace", Brand: "visa",
+	CreatedAt: createdAt, UpdatedAt: createdAt.Add(time.Hour),
+}
+
+type fakeHasher struct{}
+
+func (fakeHasher) Hash(pan string) (string, error) { return "secret-hash-" + pan, nil }
 
 func newHandler(repo *fakeRepo, reader *fakeReader) http.Handler {
 	application := app.Application{
 		Commands: app.Commands{
 			CreateCard: command.NewCreateCardHandler(
 				repo,
+				fakeHasher{},
 				func() domain.CardID { return "card-1" },
 				func() time.Time { return createdAt },
 			),
@@ -110,9 +118,15 @@ func TestCreateCard(t *testing.T) {
 	}{
 		{
 			name:   "creates a card",
-			body:   `{"pan":"` + validPAN + `","expMonth":12,"expYear":2099}`,
+			body:   `{"pan":"` + validPAN + `","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099}`,
 			status: http.StatusCreated,
-			want:   []string{`"id":"card-1"`, `"last4":"1111"`, `"expMonth":12`, `"expYear":2099`, `"createdAt":"2026-01-15T10:00:00Z"`},
+			want:   []string{`"id":"card-1"`, `"last4":"1111"`, `"expMonth":12`, `"expYear":2099`, `"cardHolderName":"Ada Lovelace"`, `"brand":"unknown"`, `"createdAt":"2026-01-15T10:00:00Z"`, `"updatedAt":"2026-01-15T10:00:00Z"`},
+		},
+		{
+			name:   "blank holder name",
+			body:   `{"pan":"` + validPAN + `","cardHolderName":" ","expMonth":12,"expYear":2099}`,
+			status: http.StatusUnprocessableEntity,
+			want:   []string{`"slug":"card_holder_name_required"`},
 		},
 		{name: "malformed json", body: `{`, status: http.StatusBadRequest, want: []string{`"slug":"invalid_json"`}},
 		{
@@ -123,33 +137,33 @@ func TestCreateCard(t *testing.T) {
 		},
 		{
 			name:   "unknown field",
-			body:   `{"pan":"` + validPAN + `","expMonth":12,"expYear":2099,"cvv":"123"}`,
+			body:   `{"pan":"` + validPAN + `","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099,"cvv":"123"}`,
 			status: http.StatusBadRequest,
 			want:   []string{`"slug":"invalid_json"`},
 		},
 		{
 			name:   "invalid pan",
-			body:   `{"pan":"123","expMonth":12,"expYear":2099}`,
+			body:   `{"pan":"123","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099}`,
 			status: http.StatusUnprocessableEntity,
 			want:   []string{`"slug":"invalid_pan"`},
 		},
 		{
 			name:   "invalid expiry",
-			body:   `{"pan":"` + validPAN + `","expMonth":12,"expYear":2099}`,
+			body:   `{"pan":"` + validPAN + `","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099}`,
 			repo:   domain.ErrInvalidExpiry,
 			status: http.StatusUnprocessableEntity,
 			want:   []string{`"slug":"invalid_expiry"`},
 		},
 		{
 			name:   "expired card",
-			body:   `{"pan":"` + validPAN + `","expMonth":12,"expYear":2099}`,
+			body:   `{"pan":"` + validPAN + `","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099}`,
 			repo:   domain.ErrCardExpired,
 			status: http.StatusUnprocessableEntity,
 			want:   []string{`"slug":"card_expired"`},
 		},
 		{
 			name:   "unexpected repository failure",
-			body:   `{"pan":"` + validPAN + `","expMonth":12,"expYear":2099}`,
+			body:   `{"pan":"` + validPAN + `","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099}`,
 			repo:   boom,
 			status: http.StatusInternalServerError,
 			want:   []string{`"slug":"internal"`, `"message":"internal error"`},
@@ -162,6 +176,9 @@ func TestCreateCard(t *testing.T) {
 			assertResponse(t, rec, tt.status, tt.want...)
 			if strings.Contains(rec.Body.String(), validPAN) {
 				t.Error("response leaks the PAN")
+			}
+			if strings.Contains(rec.Body.String(), "secret-hash") {
+				t.Error("response leaks the PAN hash")
 			}
 			if strings.Contains(rec.Body.String(), "secret-host") {
 				t.Error("response leaks the raw error")
@@ -177,7 +194,7 @@ func TestGetCard(t *testing.T) {
 		status int
 		want   []string
 	}{
-		{name: "hit", status: http.StatusOK, want: []string{`"id":"card-1"`, `"last4":"1111"`}},
+		{name: "hit", status: http.StatusOK, want: []string{`"id":"card-1"`, `"last4":"1111"`, `"cardHolderName":"Ada Lovelace"`, `"brand":"visa"`, `"updatedAt":"2026-01-15T11:00:00Z"`}},
 		{name: "not found", err: domain.ErrCardNotFound, status: http.StatusNotFound, want: []string{`"slug":"card_not_found"`}},
 	}
 	for _, tt := range tests {

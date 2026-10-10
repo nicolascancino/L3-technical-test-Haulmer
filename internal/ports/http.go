@@ -44,9 +44,10 @@ func (h HttpServer) CreateCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	card, err := h.app.Commands.CreateCard.Handle(r.Context(), command.CreateCard{
-		PAN:      body.Pan,
-		ExpMonth: body.ExpMonth,
-		ExpYear:  body.ExpYear,
+		PAN:            body.Pan,
+		CardHolderName: body.CardHolderName,
+		ExpMonth:       body.ExpMonth,
+		ExpYear:        body.ExpYear,
 	})
 	if err != nil {
 		writeDomainError(w, r, err)
@@ -54,11 +55,14 @@ func (h HttpServer) CreateCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, Card{
-		Id:        string(card.ID()),
-		Last4:     card.Last4(),
-		ExpMonth:  card.ExpMonth(),
-		ExpYear:   card.ExpYear(),
-		CreatedAt: card.CreatedAt(),
+		Id:             string(card.ID()),
+		CardHolderName: card.CardHolderName(),
+		Brand:          CardBrand(card.Brand()),
+		Last4:          card.Last4(),
+		ExpMonth:       card.ExpMonth(),
+		ExpYear:        card.ExpYear(),
+		CreatedAt:      card.CreatedAt(),
+		UpdatedAt:      card.UpdatedAt(),
 	})
 }
 
@@ -130,7 +134,11 @@ func isLast4(s string) bool {
 }
 
 func toCard(c query.Card) Card {
-	return Card{Id: c.ID, Last4: c.Last4, ExpMonth: c.ExpMonth, ExpYear: c.ExpYear, CreatedAt: c.CreatedAt}
+	return Card{
+		Id: c.ID, Last4: c.Last4, ExpMonth: c.ExpMonth, ExpYear: c.ExpYear,
+		CardHolderName: c.CardHolderName, Brand: CardBrand(c.Brand),
+		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt,
+	}
 }
 
 func toCards(cards []query.Card) []Card {
@@ -145,6 +153,8 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, domain.ErrInvalidPAN):
 		writeError(w, http.StatusUnprocessableEntity, "invalid_pan", domain.ErrInvalidPAN.Error())
+	case errors.Is(err, domain.ErrCardHolderNameRequired):
+		writeError(w, http.StatusUnprocessableEntity, "card_holder_name_required", domain.ErrCardHolderNameRequired.Error())
 	case errors.Is(err, domain.ErrInvalidExpiry):
 		writeError(w, http.StatusUnprocessableEntity, "invalid_expiry", domain.ErrInvalidExpiry.Error())
 	case errors.Is(err, domain.ErrCardExpired):
