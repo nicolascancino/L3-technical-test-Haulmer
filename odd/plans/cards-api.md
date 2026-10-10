@@ -74,7 +74,9 @@ Dependency rule: `domain` imports nothing internal; `app` -> `domain`; `ports` -
 | D4 | Luhn and expiry validation live in `domain/card.go`, enforced by `NewCard` | Business rules belong to the entity; no entry point can create an invalid card |
 | D5 | API, domain and persistence models are separate | Avoid leaking DB/PAN data through the API |
 | D6 | Time and IDs injected, never `time.Now()` in domain | Testability |
-| D7 | `/health` returns instance identity (hostname / `POD_NAME`) | Required by the challenge; useful behind a k8s Service |
+| D7 | `/health` returns instance identity (`POD_NAME` if set, hostname otherwise) | Required by the challenge; useful behind a k8s Service |
+| D8 | Card ids are UUIDv7, generated in `service` with `google/uuid`; `domain.CardID` stays a string and the column type is `uuid` | Time-ordered ids keep the Postgres primary key index compact and make cursor pagination simple. An id that is not a valid UUID is reported as not found by the repository adapter |
+| D9 | Constructors of app handlers keep panicking on nil dependencies | Human decision for now: failing at startup is intended; revisit returning `(T, error)` later |
 
 ## 5. Idempotency semantics (DEFERRED draft, not part of this phase)
 

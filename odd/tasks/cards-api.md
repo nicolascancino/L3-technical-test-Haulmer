@@ -44,7 +44,7 @@ Check a box only after the outcome and its checks were observed. Record the comm
 ## Phase 3 — Persistence and wiring
 
 - [ ] **T07 Postgres schema and tables**
-  `tables/` row structs with `gorm` tags, schema/migration for `cards`, GORM dependency, `ErrNotFound`/`ErrDuplicate`, cursor encoding.
+  `tables/` row structs with `gorm` tags, schema/migration for `cards` (`id` column of type `uuid`, plan D8), GORM dependency, `ErrNotFound`/`ErrDuplicate`, cursor encoding.
   Commit: _pending_
 
 - [ ] **T08 Postgres repositories**
@@ -53,7 +53,7 @@ Check a box only after the outcome and its checks were observed. Record the comm
   Commit: _pending_
 
 - [ ] **T09 Composition root and entry point**
-  `service/application.go`, `cmd/api/main.go`, configuration from environment, graceful shutdown.
+  `service/application.go`, `cmd/api/main.go`, configuration from environment, graceful shutdown, UUIDv7 id generator with `google/uuid` (plan D8).
   Check: service starts against a local Postgres and answers `/health`. Commit: _pending_
 
 ## Phase 4 — Delivery of this stage
