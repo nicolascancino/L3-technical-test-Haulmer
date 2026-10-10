@@ -18,7 +18,6 @@ How to resume:
 
 Open points to carry into the next tasks:
 
-- Timezone: list and search return timestamps in the local zone while create returns UTC; normalize with `.UTC()` when reading (not done, pending human go-ahead).
 - `/health` takes the instance from `POD_NAME`, falling back to the hostname; on ECS Fargate the hostname is the normal source.
 - Review advisories not yet handled: `POST /cards` accepts trailing data after the JSON body; `last4` is not checked as digits in `NewCard`/`UnmarshalCardFromDatabase`; `UnmarshalCardFromDatabase` does not validate `createdAt` or `brand`; domain tests have weak assertions; `app.Application` can be built with zero-value handlers.
 - Deferred phases (not in this list): Luhn and expiry implementation, secure PAN storage (human is researching), idempotency, Dockerfile, ECS Fargate, AWS deployment.
@@ -98,7 +97,8 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Observed: `gofmt`, `go build`, `go vet`, `go vet -tags integration`, `go test -count=1 ./...` green; writer saw RED then GREEN for config, hasher, secrets fallback and the JSON error handler.
   Observed (2026-10-10, APP_ENV=local, postgres:16): the service started, `/health` answered 200, create, list, search and an invalid cursor behaved as expected. Not exercised: the `cloud` path against real AWS Secrets Manager.
   Fixed: the duplicate-PAN 500 now answers `409` `card_already_exists` (`feat(ports): answer 409 for a duplicate card`).
-  Findings to fix: GORM logs failed INSERTs, including `pan_hash`, outside slog; list returns timestamps in the local zone while create returns UTC.
+  Findings to fix: GORM logs failed INSERTs, including `pan_hash`, outside slog.
+  Fixed: every timestamp is UTC end to end; the DSN sets `TimeZone=UTC`, GORM `NowFunc` returns UTC and rows are mapped with `.UTC()` (`fix(repository): return every timestamp in UTC`).
   Refactor (plan D12): `APP_ENV` (`local`|`cloud`, required, no default) replaces the implicit secret-source detection; `secrets.Resolve` removed. `cloud` is fail-closed: an unreadable or blank secret stops startup before the port opens. Env vars: `APP_ENV` (required), `PORT`, `POD_NAME`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_SSLMODE` (default `require`); `local`: `DB_PASSWORD`, `PAN_SALT`; `cloud`: `AWS_REGION`, `DB_PASSWORD_SECRET_ID`, `PAN_SALT_SECRET_ID`.
 
 ## Phase 4 — Delivery of this stage

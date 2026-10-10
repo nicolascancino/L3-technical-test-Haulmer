@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -31,7 +32,10 @@ func NewApplication(ctx context.Context, cfg config.Config) (app.Application, er
 		}
 	}
 
-	db, err := gorm.Open(postgres.Open(databaseURL(cfg, dbPassword)), &gorm.Config{TranslateError: true})
+	db, err := gorm.Open(postgres.Open(databaseURL(cfg, dbPassword)), &gorm.Config{
+		TranslateError: true,
+		NowFunc:        func() time.Time { return time.Now().UTC() },
+	})
 	if err != nil {
 		return app.Application{}, fmt.Errorf("open database: %w", err)
 	}
@@ -60,7 +64,7 @@ func databaseURL(cfg config.Config, password string) string {
 		User:     url.UserPassword(cfg.DBUser, password),
 		Host:     net.JoinHostPort(cfg.DBHost, cfg.DBPort),
 		Path:     cfg.DBName,
-		RawQuery: url.Values{"sslmode": {cfg.DBSSLMode}}.Encode(),
+		RawQuery: url.Values{"sslmode": {cfg.DBSSLMode}, "TimeZone": {"UTC"}}.Encode(),
 	}
 	return u.String()
 }

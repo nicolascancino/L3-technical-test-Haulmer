@@ -14,7 +14,7 @@ func TestDatabaseURL_EscapesCredentials(t *testing.T) {
 
 	got := databaseURL(cfg, "p@ss word")
 
-	want := "postgres://app:p%40ss%20word@db:5432/cards?sslmode=require"
+	want := "postgres://app:p%40ss%20word@db:5432/cards?TimeZone=UTC&sslmode=require"
 	if got != want {
 		t.Errorf("databaseURL() = %q, want %q", got, want)
 	}

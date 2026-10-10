@@ -36,8 +36,8 @@ func toQueryCard(r tables.CardRow) query.Card {
 		ExpYear:        r.ExpYear,
 		CardHolderName: r.CardHolderName,
 		Brand:          r.Brand,
-		CreatedAt:      r.CreatedAt,
-		UpdatedAt:      r.UpdatedAt,
+		CreatedAt:      r.CreatedAt.UTC(),
+		UpdatedAt:      r.UpdatedAt.UTC(),
 	}
 }
 

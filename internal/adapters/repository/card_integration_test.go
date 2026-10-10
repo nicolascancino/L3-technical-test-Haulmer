@@ -312,3 +312,34 @@ func TestSearchCardsPaginates(t *testing.T) {
 		t.Fatalf("page sizes = %v, want [2 2 1]", pageSizes)
 	}
 }
+
+func TestReadsReturnUTC(t *testing.T) {
+	cleanDB(t)
+	card := newCard(t, 1, "4242", "visa", "Ada Lovelace", 12, 2030)
+	repo := repository.NewCardRepository(testDB)
+	if err := repo.AddCard(context.Background(), card); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := repo.GetCard(context.Background(), card.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed, err := repo.ListCards(context.Background(), 10, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	searched, err := repo.SearchCards(context.Background(), query.CardFilter{Last4: "4242"}, 10, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reads := map[string]query.Card{"get": got, "list": listed.Items[0], "search": searched.Items[0]}
+	for name, c := range reads {
+		for field, ts := range map[string]time.Time{"created": c.CreatedAt, "updated": c.UpdatedAt} {
+			if ts.Location() != time.UTC || !ts.Equal(card.CreatedAt()) {
+				t.Errorf("%s %s = %v, want %v in UTC", name, field, ts, card.CreatedAt())
+			}
+		}
+	}
+}
