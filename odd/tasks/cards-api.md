@@ -72,7 +72,7 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Search (plan D13): add optional `brand`, `cardHolderName`, `expMonth`, `expYear`, `limit` and `cursor` to `cards:search` in the contract, regenerate, extend `query.SearchCards` and the `CardReader` signature, validate in `ports`, with tests.
   Must land before T07 so the table is designed once.
   Part 1 (model fields, `PANHasher`, contract fields): commit `0165f94`; reviewed, approved. Advisory for later: `UnmarshalCardFromDatabase` does not validate `brand`.
-  Part 2 (search filters and pagination): commit _see below_. Follow-up for T09: when building the generated handler, set `ErrorHandlerFunc` so wrapper errors (missing `last4`, non-integer `limit`) answer the JSON error style instead of `text/plain`.
+  Part 2 (search filters and pagination): commit `e979f65`. Follow-up for T09: when building the generated handler, set `ErrorHandlerFunc` so wrapper errors (missing `last4`, non-integer `limit`) answer the JSON error style instead of `text/plain`.
 
 - [ ] **T07 Postgres schema and tables**
   `tables/` row structs with `gorm` tags, schema/migration for `cards` (`id` column of type `uuid`, plan D8), GORM dependency, `ErrNotFound`/`ErrDuplicate`, cursor encoding.
