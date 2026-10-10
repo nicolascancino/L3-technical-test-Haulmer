@@ -8,9 +8,7 @@ type CardID string
 
 func (id CardID) IsZero() bool { return id == "" }
 
-// Card is a credit card. The full PAN is deliberately not a field: how it is
-// protected and stored is still undecided, so the entity only keeps what the
-// API needs to show and search by (last4) plus the expiry.
+// The full PAN is deliberately not a field: its protected storage is still undecided.
 type Card struct {
 	id        CardID
 	last4     string
@@ -27,8 +25,6 @@ type NewCardConfig struct {
 	CreatedAt time.Time // injected so tests do not depend on the wall clock
 }
 
-// NewCard creates a brand-new card. It enforces the business rules: the PAN
-// must pass the Luhn check and the expiry must not be in the past.
 func NewCard(cfg NewCardConfig) (*Card, error) {
 	if cfg.ID.IsZero() {
 		return nil, ErrIDIsRequired
@@ -56,9 +52,8 @@ func NewCard(cfg NewCardConfig) (*Card, error) {
 	}, nil
 }
 
-// UnmarshalCardFromDatabase rebuilds a persisted card. It validates the shape
-// of the stored data but does not re-run the expiry rule: a card that was valid
-// when created may legitimately be expired today. Only adapters should call it.
+// UnmarshalCardFromDatabase skips the expiry rule on purpose: a card valid when
+// created may legitimately be expired today.
 func UnmarshalCardFromDatabase(
 	id CardID,
 	last4 string,
@@ -80,19 +75,12 @@ func UnmarshalCardFromDatabase(
 	}, nil
 }
 
-// validatePAN checks that pan is a well-formed card number using the Luhn
-// algorithm. It returns ErrInvalidPAN when it is not.
-//
-// TODO: not implemented yet (signature only); it currently accepts any value.
+// TODO: Luhn check; signature only, currently accepts any value.
 func validatePAN(pan string) error {
 	return nil
 }
 
-// validateExpiry checks that month is in 1..12 and that the card has not
-// expired relative to now. It returns ErrInvalidExpiry for a malformed month
-// or year and ErrCardExpired for a past expiry.
-//
-// TODO: not implemented yet (signature only); it currently accepts any value.
+// TODO: month range and past-expiry check; signature only, currently accepts any value.
 func validateExpiry(month, year int, now time.Time) error {
 	return nil
 }
