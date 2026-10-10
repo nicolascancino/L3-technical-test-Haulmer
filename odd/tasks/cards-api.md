@@ -112,6 +112,12 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Remaining steps: request id middleware, request log with latency, RED metrics via EMF.
   Check: logs and metrics emitted by a handler test; no card data in any log line. Commit: _pending_
 
+- [ ] **T12 Route GORM logs through the configured slog logger**
+  Pass the logger built in `main` (`internal/logging`) to `service.NewApplication` and set it on the GORM connection through a small adapter that implements `gorm.io/gorm/logger.Interface` over `*slog.Logger`, so every database log line shares format, level, fixed attributes and masking.
+  Why: the default GORM logger writes to stderr outside `slog` and prints the failed `INSERT` with its values, including `pan_hash` (finding of the T09 run, 2026-10-10).
+  Scope: map GORM levels to slog levels; never print bound parameters (`ParameterizedQueries`); do not log `ErrRecordNotFound` or `ErrDuplicatedKey` as errors (the repository already maps them to domain errors); report slow queries above a threshold as `warn`.
+  Check: a unit test with a buffer logger proves no value of a failed insert reaches the output and that not-found is not logged as an error; the T09 manual run shows only `slog` lines. Commit: _pending_
+
 ## Deferred (separate phases, not part of this list)
 
 Optional improvements to review at the end of the project live in [`odd/requirements-and-improvements.md`](../requirements-and-improvements.md), section C.
