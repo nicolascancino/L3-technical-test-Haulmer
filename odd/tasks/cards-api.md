@@ -37,9 +37,12 @@ Check a box only after the outcome and its checks were observed. Record the comm
   Check: writer observed RED then GREEN; parent re-ran `gofmt`, `go build`, `go vet`, `go test -count=1 ./...` and verified `app` imports only `command`/`query`, which import only `domain` (observed).
   Decisions: `CreateCard` validates through the domain and discards the PAN (secure storage pending). Queries use their own `CardReader` read model in `app/query`. `limit` bounds and `last4` format are enforced in `ports/` (T06), handlers only delegate. Cursor encoding belongs to the reader (T07).
 
-- [ ] **T06 HTTP port**
+- [x] **T06 HTTP port**
   `HttpServer` implementing `ServerInterface`, domain-error -> status mapping, `/health` with instance identity.
-  Tests with `httptest` against fake `app` handlers. Commit: _pending_
+  Tests with `httptest` against fake `app` handlers. Commit: `43194b7`.
+  Check: writer observed RED then GREEN; parent re-ran `gofmt`, `go build`, `go vet`, `go test -count=1 ./...` and read `http.go` (observed). `ports` imports only `app`, `command`, `query`, `domain`.
+  Decisions: `limit` 1..100 (default 20) and `last4` format enforced here; `400` for invalid json/limit/last4/cursor, `422` for invalid PAN/expiry/expired card, `404` unknown card, unmapped errors become `500` with a fixed message and are logged. `ErrCardAlreadyExists` stays unmapped (ids are server-generated). Added `domain.ErrInvalidCursor`. Routing for `/cards:search` vs `/cards/{id}` is now a permanent test.
+  Known limit: `invalid_expiry` and `card_expired` are tested by injecting the errors through the fake repository, because `validateExpiry` is still a stub.
 
 ## Phase 3 — Persistence and wiring
 
