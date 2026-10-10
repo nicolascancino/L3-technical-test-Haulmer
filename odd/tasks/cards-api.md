@@ -20,7 +20,7 @@ Open points to carry into the next tasks:
 - T07/T08: the reader returns `domain.ErrInvalidCursor` for a bad cursor and `domain.ErrCardNotFound` for an id that is not a valid UUID (plan D8).
 - T09: resolve `/health` instance from `POD_NAME`, falling back to the hostname; set `ErrorHandlerFunc` on the generated handler so wrapper errors use the JSON error style.
 - Review advisories not yet handled: `POST /cards` accepts trailing data after the JSON body; `last4` is not checked as digits in `NewCard`/`UnmarshalCardFromDatabase`; `UnmarshalCardFromDatabase` does not validate `createdAt` or `brand`; domain tests have weak assertions; `app.Application` can be built with zero-value handlers.
-- Deferred phases (not in this list): Luhn and expiry implementation, secure PAN storage (human is researching), idempotency, Secrets Manager, CloudWatch, Dockerfile, ECS Fargate, AWS deployment.
+- Deferred phases (not in this list): Luhn and expiry implementation, secure PAN storage (human is researching), idempotency, Dockerfile, ECS Fargate, AWS deployment.
 
 Workflow reminders: generate API code with `./scripts/openapi-http.sh cards internal/ports ports` (no `make`); review one task by starting with `baseRef` set to the full sha of the previous commit; the review lens models live in `~/.pi/gentle-ai/models.json`; a candidate with a shell script is high risk and needs 4 reviewer runs, so ask first.
 
@@ -105,6 +105,11 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   `README.md`: how to run, architecture summary, endpoints, deferred items, how AI was used (link to `odd/`).
   Commit: _pending_
 
+- [ ] **T11 Observability for CloudWatch**
+  Structured JSON logs to stdout (`slog`), a request-logging middleware (method, route, status, latency, request id, never the PAN or `panHash`), and basic request metrics (count, latency, status) for CloudWatch.
+  Decide before starting: metrics through CloudWatch Embedded Metric Format in the logs (no extra SDK) or `PutMetricData`. Requirement: "basic logs and metrics in CloudWatch" (requirements file, section A; idea C7).
+  Check: logs and metrics emitted by a handler test; no card data in any log line. Commit: _pending_
+
 ## Deferred (separate phases, not part of this list)
 
 Optional improvements to review at the end of the project live in [`odd/requirements-and-improvements.md`](../requirements-and-improvements.md), section C.
@@ -112,5 +117,4 @@ Optional improvements to review at the end of the project live in [`odd/requirem
 - Idempotency (`Idempotency-Key`, same Postgres DB; draft in plan section 5)
 - Luhn and expiry implementation (+ domain tests)
 - Secure PAN storage
-- AWS Secrets Manager, CloudWatch
 - Dockerfile, ECS Fargate task definition and service, AWS deployment
