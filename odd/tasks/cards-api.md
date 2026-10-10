@@ -7,18 +7,19 @@ Check a box only after the outcome and its checks were observed. Record the comm
 
 ## Handoff (updated 2026-10-10)
 
-Status: T01 to T06, T06b and T06c done and reviewed (8 of 12). Branch `feat/cards-api`, nothing pushed yet. Next: **T07**.
+Status: T01 to T09 (including T06b and T06c) done: 11 of 14. Open: T10, T11 (step 1 done, paused by the human), T12. Branch `feat/cards-api`, nothing pushed yet.
 
 How to resume:
 
-1. `git switch feat/cards-api`, then run `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test -count=1 ./...` (all green at this point).
+1. `git switch feat/cards-api`, then run `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test -count=1 ./...` (all green at this point). Integration tests need Docker: `go test -tags integration ./internal/adapters/repository/`.
 2. Read plan decisions D1 to D13 in [`odd/plans/cards-api.md`](../plans/cards-api.md).
-3. Start T07 below. It adds the GORM and Postgres driver dependencies.
+3. Local run: `APP_ENV=local DB_HOST=... DB_NAME=... DB_USER=... DB_PASSWORD=... DB_SSLMODE=disable PAN_SALT=... go run ./cmd/api`.
+4. Next: T12 (GORM logs through slog, it leaks `pan_hash` today), then T10 (README), then T11 step 2.
 
 Open points to carry into the next tasks:
 
-- T07/T08: the reader returns `domain.ErrInvalidCursor` for a bad cursor and `domain.ErrCardNotFound` for an id that is not a valid UUID (plan D8).
-- T09: resolve `/health` instance from `POD_NAME`, falling back to the hostname; set `ErrorHandlerFunc` on the generated handler so wrapper errors use the JSON error style.
+- Timezone: list and search return timestamps in the local zone while create returns UTC; normalize with `.UTC()` when reading (not done, pending human go-ahead).
+- `/health` takes the instance from `POD_NAME`, falling back to the hostname; on ECS Fargate the hostname is the normal source.
 - Review advisories not yet handled: `POST /cards` accepts trailing data after the JSON body; `last4` is not checked as digits in `NewCard`/`UnmarshalCardFromDatabase`; `UnmarshalCardFromDatabase` does not validate `createdAt` or `brand`; domain tests have weak assertions; `app.Application` can be built with zero-value handlers.
 - Deferred phases (not in this list): Luhn and expiry implementation, secure PAN storage (human is researching), idempotency, Dockerfile, ECS Fargate, AWS deployment.
 
