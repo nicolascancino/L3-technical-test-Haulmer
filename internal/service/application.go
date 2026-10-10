@@ -20,17 +20,15 @@ import (
 )
 
 func NewApplication(ctx context.Context, cfg config.Config) (app.Application, error) {
-	awsSecrets, err := secrets.NewAWSClient(ctx, cfg.AWSRegion)
-	if err != nil {
-		return app.Application{}, err
-	}
-	dbPassword, err := secrets.Resolve(ctx, awsSecrets, cfg.DBPasswordSecretID, cfg.DBPassword)
-	if err != nil {
-		return app.Application{}, err
-	}
-	panSalt, err := secrets.Resolve(ctx, awsSecrets, cfg.PANSaltSecretID, cfg.PANSalt)
-	if err != nil {
-		return app.Application{}, err
+	dbPassword, panSalt := cfg.DBPassword, cfg.PANSalt
+	if cfg.Env == config.Cloud {
+		awsSecrets, err := secrets.NewAWSClient(ctx, cfg.AWSRegion)
+		if err != nil {
+			return app.Application{}, err
+		}
+		if dbPassword, panSalt, err = readCloudSecrets(ctx, awsSecrets, cfg); err != nil {
+			return app.Application{}, err
+		}
 	}
 
 	db, err := gorm.Open(postgres.Open(databaseURL(cfg, dbPassword)), &gorm.Config{TranslateError: true})

@@ -5,7 +5,15 @@ import (
 	"strings"
 )
 
+type Env string
+
+const (
+	Local Env = "local"
+	Cloud Env = "cloud"
+)
+
 type Config struct {
+	Env     Env
 	Port    string
 	PodName string
 
@@ -15,29 +23,26 @@ type Config struct {
 	DBUser     string
 	DBSSLMode  string
 	DBPassword string
+	PANSalt    string
 
 	AWSRegion          string
 	DBPasswordSecretID string
-	PANSalt            string
 	PANSaltSecretID    string
 }
 
-// Load reads the settings through getenv. A secret id replaces its plain
-// value (DB_PASSWORD, PAN_SALT), which exists for local runs.
+// Load reads the settings through getenv. APP_ENV selects where the secrets
+// come from: the environment (local) or AWS Secrets Manager (cloud). The
+// settings of the other mode are never read.
 func Load(getenv func(string) string) (Config, error) {
 	cfg := Config{
-		Port:               valueOr(getenv("PORT"), "8080"),
-		PodName:            getenv("POD_NAME"),
-		DBHost:             getenv("DB_HOST"),
-		DBPort:             valueOr(getenv("DB_PORT"), "5432"),
-		DBName:             getenv("DB_NAME"),
-		DBUser:             getenv("DB_USER"),
-		DBSSLMode:          valueOr(getenv("DB_SSLMODE"), "require"),
-		DBPassword:         getenv("DB_PASSWORD"),
-		AWSRegion:          getenv("AWS_REGION"),
-		DBPasswordSecretID: getenv("DB_PASSWORD_SECRET_ID"),
-		PANSalt:            getenv("PAN_SALT"),
-		PANSaltSecretID:    getenv("PAN_SALT_SECRET_ID"),
+		Env:       Env(getenv("APP_ENV")),
+		Port:      valueOr(getenv("PORT"), "8080"),
+		PodName:   getenv("POD_NAME"),
+		DBHost:    getenv("DB_HOST"),
+		DBPort:    valueOr(getenv("DB_PORT"), "5432"),
+		DBName:    getenv("DB_NAME"),
+		DBUser:    getenv("DB_USER"),
+		DBSSLMode: valueOr(getenv("DB_SSLMODE"), "require"),
 	}
 
 	var missing []string
@@ -46,20 +51,29 @@ func Load(getenv func(string) string) (Config, error) {
 			missing = append(missing, name)
 		}
 	}
+
+	switch cfg.Env {
+	case Local:
+		cfg.DBPassword = getenv("DB_PASSWORD")
+		cfg.PANSalt = getenv("PAN_SALT")
+		require("DB_PASSWORD", cfg.DBPassword)
+		require("PAN_SALT", cfg.PANSalt)
+	case Cloud:
+		cfg.AWSRegion = getenv("AWS_REGION")
+		cfg.DBPasswordSecretID = getenv("DB_PASSWORD_SECRET_ID")
+		cfg.PANSaltSecretID = getenv("PAN_SALT_SECRET_ID")
+		require("AWS_REGION", cfg.AWSRegion)
+		require("DB_PASSWORD_SECRET_ID", cfg.DBPasswordSecretID)
+		require("PAN_SALT_SECRET_ID", cfg.PANSaltSecretID)
+	default:
+		missing = append(missing, `APP_ENV (must be "local" or "cloud")`)
+	}
 	require("DB_HOST", cfg.DBHost)
 	require("DB_NAME", cfg.DBName)
 	require("DB_USER", cfg.DBUser)
-	if cfg.DBPasswordSecretID == "" {
-		require("DB_PASSWORD", cfg.DBPassword)
-	}
-	if cfg.PANSaltSecretID == "" {
-		require("PAN_SALT", cfg.PANSalt)
-	}
-	if cfg.DBPasswordSecretID != "" || cfg.PANSaltSecretID != "" {
-		require("AWS_REGION", cfg.AWSRegion)
-	}
+
 	if len(missing) > 0 {
-		return Config{}, fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
+		return Config{}, fmt.Errorf("invalid environment: %s", strings.Join(missing, ", "))
 	}
 	return cfg, nil
 }

@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -24,10 +25,10 @@ func NewAWSClient(ctx context.Context, region string) (AWSClient, error) {
 func (c AWSClient) Get(ctx context.Context, secretID string) (string, error) {
 	out, err := c.client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: aws.String(secretID)})
 	if err != nil {
-		return "", fmt.Errorf("get secret %q: %w", secretID, err)
+		return "", fmt.Errorf("get secret value: %w", err)
 	}
 	if out.SecretString == nil {
-		return "", fmt.Errorf("secret %q has no string value", secretID)
+		return "", errors.New("secret has no string value")
 	}
 	return *out.SecretString, nil
 }

@@ -11,11 +11,24 @@ func env(values map[string]string) func(string) string {
 
 func validEnv() map[string]string {
 	return map[string]string{
+		"APP_ENV":     "local",
 		"DB_HOST":     "localhost",
 		"DB_NAME":     "cards",
 		"DB_USER":     "cards",
 		"DB_PASSWORD": "secret",
 		"PAN_SALT":    "salt",
+	}
+}
+
+func cloudEnv() map[string]string {
+	return map[string]string{
+		"APP_ENV":               "cloud",
+		"DB_HOST":               "db",
+		"DB_NAME":               "cards",
+		"DB_USER":               "cards",
+		"DB_PASSWORD_SECRET_ID": "cards/db",
+		"PAN_SALT_SECRET_ID":    "cards/salt",
+		"AWS_REGION":            "us-east-1",
 	}
 }
 
@@ -27,8 +40,8 @@ func TestLoad_AppliesDefaults(t *testing.T) {
 	if cfg.Port != "8080" || cfg.DBPort != "5432" || cfg.DBSSLMode != "require" {
 		t.Errorf("defaults = port %q, db port %q, sslmode %q", cfg.Port, cfg.DBPort, cfg.DBSSLMode)
 	}
-	if cfg.DBPassword != "secret" || cfg.PANSalt != "salt" {
-		t.Errorf("fallback values not loaded: %+v", cfg)
+	if cfg.Env != Local || cfg.DBPassword != "secret" || cfg.PANSalt != "salt" {
+		t.Errorf("local values not loaded: %+v", cfg)
 	}
 }
 
@@ -52,17 +65,43 @@ func TestLoad_FailsOnMissingValues(t *testing.T) {
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
-	for _, name := range []string{"DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD", "PAN_SALT"} {
+	for _, name := range []string{"APP_ENV", "DB_HOST", "DB_NAME", "DB_USER"} {
 		if !strings.Contains(err.Error(), name) {
 			t.Errorf("error %q does not name %s", err, name)
 		}
 	}
 }
 
-func TestLoad_SecretIDReplacesFallbackValue(t *testing.T) {
+func TestLoad_RejectsUnknownAppEnv(t *testing.T) {
+	for _, value := range []string{"", "prod", "Local"} {
+		values := validEnv()
+		values["APP_ENV"] = value
+
+		_, err := Load(env(values))
+		if err == nil || !strings.Contains(err.Error(), "APP_ENV") {
+			t.Errorf("APP_ENV=%q: Load() error = %v, want APP_ENV error", value, err)
+		}
+	}
+}
+
+func TestLoad_LocalRequiresPlainValues(t *testing.T) {
 	values := validEnv()
 	delete(values, "DB_PASSWORD")
 	delete(values, "PAN_SALT")
+
+	_, err := Load(env(values))
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	for _, name := range []string{"DB_PASSWORD", "PAN_SALT"} {
+		if !strings.Contains(err.Error(), name) {
+			t.Errorf("error %q does not name %s", err, name)
+		}
+	}
+}
+
+func TestLoad_LocalIgnoresSecretSettings(t *testing.T) {
+	values := validEnv()
 	values["DB_PASSWORD_SECRET_ID"] = "cards/db"
 	values["PAN_SALT_SECRET_ID"] = "cards/salt"
 	values["AWS_REGION"] = "us-east-1"
@@ -71,17 +110,48 @@ func TestLoad_SecretIDReplacesFallbackValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.DBPasswordSecretID != "cards/db" || cfg.PANSaltSecretID != "cards/salt" || cfg.AWSRegion != "us-east-1" {
+	if cfg.DBPasswordSecretID != "" || cfg.PANSaltSecretID != "" || cfg.AWSRegion != "" {
+		t.Errorf("secret settings not ignored: %+v", cfg)
+	}
+}
+
+func TestLoad_CloudReadsSecretSettings(t *testing.T) {
+	cfg, err := Load(env(cloudEnv()))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Env != Cloud || cfg.DBPasswordSecretID != "cards/db" || cfg.PANSaltSecretID != "cards/salt" || cfg.AWSRegion != "us-east-1" {
 		t.Errorf("secret settings not loaded: %+v", cfg)
 	}
 }
 
-func TestLoad_SecretIDRequiresRegion(t *testing.T) {
-	values := validEnv()
-	values["PAN_SALT_SECRET_ID"] = "cards/salt"
+func TestLoad_CloudRequiresSecretSettings(t *testing.T) {
+	values := cloudEnv()
+	delete(values, "DB_PASSWORD_SECRET_ID")
+	delete(values, "PAN_SALT_SECRET_ID")
+	delete(values, "AWS_REGION")
 
 	_, err := Load(env(values))
-	if err == nil || !strings.Contains(err.Error(), "AWS_REGION") {
-		t.Fatalf("Load() error = %v, want AWS_REGION error", err)
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	for _, name := range []string{"DB_PASSWORD_SECRET_ID", "PAN_SALT_SECRET_ID", "AWS_REGION"} {
+		if !strings.Contains(err.Error(), name) {
+			t.Errorf("error %q does not name %s", err, name)
+		}
+	}
+}
+
+func TestLoad_CloudIgnoresPlainValues(t *testing.T) {
+	values := cloudEnv()
+	values["DB_PASSWORD"] = "plain"
+	values["PAN_SALT"] = "plain"
+
+	cfg, err := Load(env(values))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.DBPassword != "" || cfg.PANSalt != "" {
+		t.Errorf("plain values were read in cloud: %+v", cfg)
 	}
 }
