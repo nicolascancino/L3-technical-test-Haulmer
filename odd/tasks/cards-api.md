@@ -19,9 +19,10 @@ Check a box only after the outcome and its checks were observed. Record the comm
   Check: `go build`, `go vet`, `go test ./internal/domain` pass; `domain` imports only `context`, `errors`, `time` (observed). Commit: `149b901`.
   Decisions: `Card` keeps `last4`, `expMonth`, `expYear` and does not retain the full PAN (storage pending). Listing and `last4` search are read models, defined in `app/query` (T05), not in `CardRepository`. The stubs accept any value until the deferred Luhn/expiry phase.
 
-- [ ] **T03 OpenAPI contract**
+- [x] **T03 OpenAPI contract**
   `api/openapi/cards.yml` with the 5 operations, `Error` schema, pagination and masked card schemas.
-  Check: contract validates. Commit: _pending_
+  Check: `go tool oapi-codegen -generate types,chi-server` parses it and yields the 5 `ServerInterface` methods, including `/cards:search` (observed). Commit: `05b9f0e`.
+  Decisions: `400` malformed request, `422` business-rule violation (invalid PAN, expired card), `404` unknown card. Responses never include the PAN. `limit` bounds and defaults live in `ports/`, not in the schema.
 
 - [ ] **T04 Code generation**
   `scripts/openapi-http.sh`, `make openapi_http`, commit generated `internal/ports/*.gen.go`.
