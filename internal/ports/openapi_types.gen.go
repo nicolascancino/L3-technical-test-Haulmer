@@ -60,6 +60,9 @@ type InternalError = Error
 // NotFound defines model for NotFound.
 type NotFound = Error
 
+// PayloadTooLarge defines model for PayloadTooLarge.
+type PayloadTooLarge = Error
+
 // UnprocessableEntity defines model for UnprocessableEntity.
 type UnprocessableEntity = Error
 

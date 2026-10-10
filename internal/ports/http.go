@@ -34,6 +34,11 @@ func (h HttpServer) CreateCard(w http.ResponseWriter, r *http.Request) {
 
 	var body CreateCardJSONRequestBody
 	if err := dec.Decode(&body); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "request body exceeds the 1 MiB limit")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON")
 		return
 	}

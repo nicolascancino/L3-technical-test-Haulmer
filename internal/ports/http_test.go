@@ -116,6 +116,12 @@ func TestCreateCard(t *testing.T) {
 		},
 		{name: "malformed json", body: `{`, status: http.StatusBadRequest, want: []string{`"slug":"invalid_json"`}},
 		{
+			name:   "body over the size limit",
+			body:   `{"pan":"` + strings.Repeat("1", 1<<20+1) + `","expMonth":12,"expYear":2099}`,
+			status: http.StatusRequestEntityTooLarge,
+			want:   []string{`"slug":"payload_too_large"`},
+		},
+		{
 			name:   "unknown field",
 			body:   `{"pan":"` + validPAN + `","expMonth":12,"expYear":2099,"cvv":"123"}`,
 			status: http.StatusBadRequest,
