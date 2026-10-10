@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/adapters/repository/tables"
+	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/app/query"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/domain"
 )
 
@@ -25,6 +26,19 @@ func toRow(c *domain.Card) (tables.CardRow, error) {
 		CreatedAt:      c.CreatedAt(),
 		UpdatedAt:      c.UpdatedAt(),
 	}, nil
+}
+
+func toQueryCard(r tables.CardRow) query.Card {
+	return query.Card{
+		ID:             r.ID,
+		Last4:          r.Last4,
+		ExpMonth:       r.ExpMonth,
+		ExpYear:        r.ExpYear,
+		CardHolderName: r.CardHolderName,
+		Brand:          r.Brand,
+		CreatedAt:      r.CreatedAt,
+		UpdatedAt:      r.UpdatedAt,
+	}
 }
 
 // A malformed id cannot exist in a uuid column, so it is reported as not found (plan D8).

@@ -78,16 +78,3 @@ func (r CardRepository) page(ctx context.Context, q *gorm.DB, limit int, token s
 	}
 	return page, nil
 }
-
-func toQueryCard(r tables.CardRow) query.Card {
-	return query.Card{
-		ID:             r.ID,
-		Last4:          r.Last4,
-		ExpMonth:       r.ExpMonth,
-		ExpYear:        r.ExpYear,
-		CardHolderName: r.CardHolderName,
-		Brand:          r.Brand,
-		CreatedAt:      r.CreatedAt,
-		UpdatedAt:      r.UpdatedAt,
-	}
-}
