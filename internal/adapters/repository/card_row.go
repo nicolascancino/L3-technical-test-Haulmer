@@ -9,14 +9,12 @@ import (
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/domain"
 )
 
-type cardRow tables.CardRow
-
-func toRow(c *domain.Card) (cardRow, error) {
+func toRow(c *domain.Card) (tables.CardRow, error) {
 	id, err := parseCardID(c.ID())
 	if err != nil {
-		return cardRow{}, err
+		return tables.CardRow{}, err
 	}
-	return cardRow{
+	return tables.CardRow{
 		ID:             id.String(),
 		CardHolderName: c.CardHolderName(),
 		Brand:          string(c.Brand()),
@@ -27,18 +25,6 @@ func toRow(c *domain.Card) (cardRow, error) {
 		CreatedAt:      c.CreatedAt(),
 		UpdatedAt:      c.UpdatedAt(),
 	}, nil
-}
-
-func (r cardRow) toDomain() (*domain.Card, error) {
-	return domain.UnmarshalCardFromDatabase(
-		domain.CardID(r.ID),
-		r.Last4,
-		r.ExpMonth, r.ExpYear,
-		r.CardHolderName,
-		domain.CardBrand(r.Brand),
-		r.PANHash,
-		r.CreatedAt, r.UpdatedAt,
-	)
 }
 
 // A malformed id cannot exist in a uuid column, so it is reported as not found (plan D8).

@@ -13,8 +13,8 @@ import (
 )
 
 // It is both the write port and the read model. The connection must be opened
-// with gorm.Config{TranslateError: true} so unique
-// violations surface as gorm.ErrDuplicatedKey.
+// with gorm.Config{TranslateError: true} so unique violations surface as
+// gorm.ErrDuplicatedKey.
 type CardRepository struct {
 	db *gorm.DB
 }
@@ -28,8 +28,7 @@ func (r CardRepository) AddCard(ctx context.Context, c *domain.Card) error {
 	if err != nil {
 		return err
 	}
-	record := tables.CardRow(row)
-	err = r.db.WithContext(ctx).Create(&record).Error
+	err = r.db.WithContext(ctx).Create(&row).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return fmt.Errorf("%w: %s", domain.ErrCardAlreadyExists, c.ID())
 	}

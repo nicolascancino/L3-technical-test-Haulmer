@@ -7,10 +7,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/adapters/repository/tables"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/domain"
 )
 
-func TestCardRowRoundTrip(t *testing.T) {
+func TestToRow(t *testing.T) {
 	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 	card, err := domain.NewCard(domain.NewCardConfig{
 		ID:             domain.CardID(uuid.Must(uuid.NewV7()).String()),
@@ -29,13 +30,20 @@ func TestCardRowRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("toRow: %v", err)
 	}
-	got, err := row.toDomain()
-	if err != nil {
-		t.Fatalf("toDomain: %v", err)
-	}
 
-	if *got != *card {
-		t.Fatalf("got %+v, want %+v", got, card)
+	want := tables.CardRow{
+		ID:             string(card.ID()),
+		CardHolderName: "Ada Lovelace",
+		Brand:          string(card.Brand()),
+		PANHash:        "hash",
+		Last4:          "1111",
+		ExpMonth:       12,
+		ExpYear:        2030,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	if row != want {
+		t.Fatalf("got %+v, want %+v", row, want)
 	}
 }
 

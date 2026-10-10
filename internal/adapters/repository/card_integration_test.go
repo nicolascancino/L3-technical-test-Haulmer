@@ -174,20 +174,6 @@ func TestGetCardNotFound(t *testing.T) {
 	}
 }
 
-func TestReaderGetCard(t *testing.T) {
-	cleanDB(t)
-	cards := seedCards(t)
-
-	got, err := repository.NewCardRepository(testDB).GetCard(context.Background(), cards[0].ID())
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.ID != string(cards[0].ID()) || got.Last4 != "1111" || got.Brand != "visa" || got.CardHolderName != "Ada Lovelace" {
-		t.Fatalf("got %+v", got)
-	}
-}
-
 func TestListCardsPaginates(t *testing.T) {
 	cleanDB(t)
 	cards := seedCards(t)
