@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -363,7 +364,7 @@ func TestSearchCards_Last4IsRequired(t *testing.T) {
 }
 
 func TestNewHandler_WrapperErrorsAreJSON(t *testing.T) {
-	handler := ports.NewHandler(app.Application{}, "test")
+	handler := ports.NewHandler(app.Application{}, "test", slog.New(slog.DiscardHandler))
 
 	for _, target := range []string{"/cards:search", "/cards?limit=abc"} {
 		rec := httptest.NewRecorder()

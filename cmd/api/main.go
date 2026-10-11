@@ -58,7 +58,7 @@ func run() error {
 
 	server := &http.Server{
 		Addr:              net.JoinHostPort("", cfg.Port),
-		Handler:           ports.NewHandler(application, instance),
+		Handler:           ports.NewHandler(application, instance, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

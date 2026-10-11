@@ -8,10 +8,14 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
+
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/app"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/app/command"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/app/query"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/domain"
+	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/ports/middleware"
 )
 
 const (
@@ -221,7 +225,7 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, domain.ErrInvalidCursor):
 		writeError(w, http.StatusBadRequest, "invalid_cursor", domain.ErrInvalidCursor.Error())
 	default:
-		slog.ErrorContext(r.Context(), "unexpected error", "error", err)
+		slog.ErrorContext(r.Context(), "unexpected error", "request_id", chimw.GetReqID(r.Context()), "error", err)
 		writeError(w, http.StatusInternalServerError, "internal", "internal error")
 	}
 }
@@ -239,8 +243,12 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 }
 
 // NewHandler builds the chi router; wrapper errors (bad query parameters) answer in the JSON error style.
-func NewHandler(application app.Application, instance string) http.Handler {
+// Middleware is registered on the router, not in ChiServerOptions, so unmatched routes are logged too.
+func NewHandler(application app.Application, instance string, logger *slog.Logger) http.Handler {
+	router := chi.NewRouter()
+	router.Use(chimw.RequestID, middleware.RequestLog(logger))
 	return HandlerWithOptions(NewHttpServer(application, instance), ChiServerOptions{
+		BaseRouter: router,
 		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
 			writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		},
