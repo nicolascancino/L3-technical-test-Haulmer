@@ -7,14 +7,14 @@ Check a box only after the outcome and its checks were observed. Record the comm
 
 ## Handoff (updated 2026-10-10)
 
-Status: T01 to T09 (including T06b and T06c) done: 11 of 14. Open: T10, T11 (step 1 done, paused by the human), T12. Branch `feat/cards-api`, nothing pushed yet.
+Status: T01 to T09 (including T06b and T06c) and T11 done: 12 of 14. Open: T10, T12. Branch `feat/cards-api`, nothing pushed yet.
 
 How to resume:
 
 1. `git switch feat/cards-api`, then run `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test -count=1 ./...` (all green at this point). Integration tests need Docker: `go test -tags integration ./internal/adapters/repository/`.
 2. Read plan decisions D1 to D13 in [`odd/plans/cards-api.md`](../plans/cards-api.md).
 3. Local run: `APP_ENV=local DB_HOST=... DB_NAME=... DB_USER=... DB_PASSWORD=... DB_SSLMODE=disable PAN_SALT=... go run ./cmd/api`.
-4. Next: T12 (GORM logs through slog, it leaks `pan_hash` today), then T10 (README), then T11 step 2.
+4. Next: T12 (GORM logs through slog, it leaks `pan_hash` today), then T10 (README).
 
 Open points to carry into the next tasks:
 
@@ -107,12 +107,12 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   `README.md`: how to run, architecture summary, endpoints, deferred items, how AI was used (link to `odd/`).
   Commit: _pending_
 
-- [ ] **T11 Observability for CloudWatch**
+- [x] **T11 Observability for CloudWatch**
   Structured JSON logs to stdout (`slog`), a request-logging middleware (method, route, status, latency, request id, never the PAN or `panHash`), and basic request metrics (count, latency, status) for CloudWatch.
   Decide before starting: metrics through CloudWatch Embedded Metric Format in the logs (no extra SDK) or `PutMetricData`. Requirement: "basic logs and metrics in CloudWatch" (requirements file, section A; idea C7).
   Step 1 done (human-approved): `log/slog` logger built once in `main` and injected (`internal/logging`), `TextHandler` or `JSONHandler` by `LOG_FORMAT`, `LOG_LEVEL`, fixed attributes `service`/`env`/`instance`, UTC RFC3339 time, masking of sensitive keys (also in groups), source only at debug. No new dependency.
-  Remaining steps: request id middleware, request log with latency, RED metrics via EMF.
-  Check: logs and metrics emitted by a handler test; no card data in any log line. Commit: _pending_
+  Step 2 done: request id (chi `RequestID`) and request log with latency in `internal/ports/middleware`, registered on the router in `ports.NewHandler` (not in `ChiServerOptions`) so unmatched routes (404) are logged too. Route pattern only, never raw path, query or body; `/health` logs at debug, 5xx at error. RED metrics (requests, latency_ms; dimensions method, route, status_class) go through CloudWatch Embedded Metric Format in the same log line (`_aws`), no SDK; they are only meaningful with `LOG_FORMAT=json` (default in cloud).
+  Check: logs and metrics emitted by a handler test; no card data in any log line. Commit: 5afb510 (step 2).
 
 - [ ] **T12 Route GORM logs through the configured slog logger**
   Pass the logger built in `main` (`internal/logging`) to `service.NewApplication` and set it on the GORM connection through a small adapter that implements `gorm.io/gorm/logger.Interface` over `*slog.Logger`, so every database log line shares format, level, fixed attributes and masking.
