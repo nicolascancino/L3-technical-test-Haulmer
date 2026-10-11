@@ -5,16 +5,16 @@ Plan: [`odd/plans/cards-api.md`](../plans/cards-api.md)
 Rules: one task = one reviewable work unit = at least one Conventional Commit on a feature branch.
 Check a box only after the outcome and its checks were observed. Record the commit hash as evidence.
 
-## Handoff (updated 2026-10-10)
+## Handoff (updated 2026-10-11)
 
-Status: T01 to T09 (including T06b and T06c), T11 and T11b done: 13 of 15. Open: T10, T12. Branch `feat/cards-api`, nothing pushed yet.
+Status: T01 to T09 (including T06b and T06c), T11, T11b and T12 done: 14 of 15. Open: T10. Branch `feat/cards-api`, nothing pushed yet.
 
 How to resume:
 
 1. `git switch feat/cards-api`, then run `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test -count=1 ./...` (all green at this point). Integration tests need Docker: `go test -tags integration ./internal/adapters/repository/`.
 2. Read plan decisions D1 to D13 in [`odd/plans/cards-api.md`](../plans/cards-api.md).
 3. Local run: `APP_ENV=local DB_HOST=... DB_NAME=... DB_USER=... DB_PASSWORD=... DB_SSLMODE=disable PAN_SALT=... go run ./cmd/api`.
-4. Next: T12 (GORM logs through slog, it leaks `pan_hash` today), then T10 (README).
+4. Next: T10 (README).
 
 Open points to carry into the next tasks:
 
@@ -120,11 +120,12 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Front-end guidance: send its own `X-Request-Id` per user action, show `requestId` in error messages, and expose the header through `Access-Control-Expose-Headers` if the API is served cross-origin (CORS is not configured in this API yet).
   Check: middleware tests for valid, missing and invalid ids; request log tests for `path` and no query string; `NewHandler` tests for header, echo, `requestId` in the error body and the same id in the access log. Commit: 8112566.
 
-- [ ] **T12 Route GORM logs through the configured slog logger**
+- [x] **T12 Route GORM logs through the configured slog logger**
   Pass the logger built in `main` (`internal/logging`) to `service.NewApplication` and set it on the GORM connection through a small adapter that implements `gorm.io/gorm/logger.Interface` over `*slog.Logger`, so every database log line shares format, level, fixed attributes and masking.
   Why: the default GORM logger writes to stderr outside `slog` and prints the failed `INSERT` with its values, including `pan_hash` (finding of the T09 run, 2026-10-10).
   Scope: map GORM levels to slog levels; never print bound parameters (`ParameterizedQueries`); do not log `ErrRecordNotFound` or `ErrDuplicatedKey` as errors (the repository already maps them to domain errors); report slow queries above a threshold as `warn`.
   Check: a unit test with a buffer logger proves no value of a failed insert reaches the output and that not-found is not logged as an error; the T09 manual run shows only `slog` lines. Commit: _pending_
+  Note: the `error` text of non-translated Postgres errors is not controlled by us and is covered only by key-based masking.
 
 ## Deferred (separate phases, not part of this list)
 

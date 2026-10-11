@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/url"
 	"time"
@@ -20,7 +21,7 @@ import (
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/config"
 )
 
-func NewApplication(ctx context.Context, cfg config.Config) (app.Application, error) {
+func NewApplication(ctx context.Context, cfg config.Config, logger *slog.Logger) (app.Application, error) {
 	dbPassword, panSalt := cfg.DBPassword, cfg.PANSalt
 	if cfg.Env == config.Cloud {
 		awsSecrets, err := secrets.NewAWSClient(ctx, cfg.AWSRegion)
@@ -33,6 +34,7 @@ func NewApplication(ctx context.Context, cfg config.Config) (app.Application, er
 	}
 
 	db, err := gorm.Open(postgres.Open(databaseURL(cfg, dbPassword)), &gorm.Config{
+		Logger:         repository.NewGormLogger(logger),
 		TranslateError: true,
 		NowFunc:        func() time.Time { return time.Now().UTC() },
 	})
