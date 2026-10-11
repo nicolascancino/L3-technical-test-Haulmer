@@ -124,7 +124,7 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Pass the logger built in `main` (`internal/logging`) to `service.NewApplication` and set it on the GORM connection through a small adapter that implements `gorm.io/gorm/logger.Interface` over `*slog.Logger`, so every database log line shares format, level, fixed attributes and masking.
   Why: the default GORM logger writes to stderr outside `slog` and prints the failed `INSERT` with its values, including `pan_hash` (finding of the T09 run, 2026-10-10).
   Scope: map GORM levels to slog levels; never print bound parameters (`ParameterizedQueries`); do not log `ErrRecordNotFound` or `ErrDuplicatedKey` as errors (the repository already maps them to domain errors); report slow queries above a threshold as `warn`.
-  Check: a unit test with a buffer logger proves no value of a failed insert reaches the output and that not-found is not logged as an error; the T09 manual run shows only `slog` lines. Commit: _pending_
+  Check: a unit test with a buffer logger proves no value of a failed insert reaches the output and that not-found is not logged as an error; the T09 manual run shows only `slog` lines. Commit: cdfa39b.
   Note: the `error` text of non-translated Postgres errors is not controlled by us and is covered only by key-based masking.
 
 ## Deferred (separate phases, not part of this list)
