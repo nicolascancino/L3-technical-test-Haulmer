@@ -14,13 +14,12 @@ How to resume:
 1. `git switch feat/cards-api`, then run `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test -count=1 ./...` (all green at this point). Integration tests need Docker: `go test -tags integration ./internal/adapters/repository/`.
 2. Read plan decisions D1 to D13 in [`odd/plans/cards-api.md`](../plans/cards-api.md).
 3. Local run: `APP_ENV=local DB_HOST=... DB_NAME=... DB_USER=... DB_PASSWORD=... DB_SSLMODE=disable PAN_SALT=... go run ./cmd/api`.
-4. Next: T10 (README).
+4. Next: pick from the TODO section at the end of this file. Suggested start: Luhn, expiry and brand detection (pure domain, easy to test).
 
 Open points to carry into the next tasks:
 
 - `/health` takes the instance from `POD_NAME`, falling back to the hostname; on ECS Fargate the hostname is the normal source.
-- Review advisories not yet handled: `POST /cards` accepts trailing data after the JSON body; `last4` is not checked as digits in `NewCard`/`UnmarshalCardFromDatabase`; `UnmarshalCardFromDatabase` does not validate `createdAt` or `brand`; domain tests have weak assertions; `app.Application` can be built with zero-value handlers.
-- Deferred phases (not in this list): Luhn and expiry implementation, secure PAN storage (human is researching), idempotency, Dockerfile, ECS Fargate, AWS deployment.
+- Open review advisories and deferred phases are listed as a checklist in the TODO section at the end of this file.
 
 Workflow reminders: generate API code with `./scripts/openapi-http.sh cards internal/ports ports` (no `make`); review one task by starting with `baseRef` set to the full sha of the previous commit; the review lens models live in `~/.pi/gentle-ai/models.json`; a candidate with a shell script is high risk and needs 4 reviewer runs, so ask first.
 
@@ -128,11 +127,33 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Check: a unit test with a buffer logger proves no value of a failed insert reaches the output and that not-found is not logged as an error; the T09 manual run shows only `slog` lines. Commit: cdfa39b.
   Note: the `error` text of non-translated Postgres errors is not controlled by us and is covered only by key-based masking.
 
-## Deferred (separate phases, not part of this list)
+## TODO (not part of the 15 tasks above)
 
 Optional improvements to review at the end of the project live in [`odd/requirements-and-improvements.md`](../requirements-and-improvements.md), section C.
 
-- Idempotency (`Idempotency-Key`, same Postgres DB; draft in plan section 5)
-- Luhn and expiry implementation (+ domain tests)
-- Secure PAN storage
-- Dockerfile, ECS Fargate task definition and service, AWS deployment
+Deferred phases:
+
+- [ ] **Luhn, expiry and brand detection**: implement `validatePAN`, `validateExpiry` and `detectBrand` in `internal/domain/card.go` with domain tests. Today every PAN and expiry is accepted and `brand` is always `unknown`.
+- [ ] **Secure PAN storage**: only the one-way `panHash` exists; reversible storage (KMS encryption or tokenization) is under research by the human.
+- [ ] **Idempotency** by `Idempotency-Key` (same Postgres DB; draft in plan section 5).
+- [ ] **Dockerfile, ECS Fargate task definition and service, load balancer, RDS, AWS deployment** (target design is in the README diagram).
+
+Open review advisories:
+
+- [ ] `POST /cards` accepts trailing data after the JSON body.
+- [ ] `last4` is not checked as digits in `NewCard` and `UnmarshalCardFromDatabase`.
+- [ ] `UnmarshalCardFromDatabase` does not validate `createdAt` or `brand`.
+- [ ] Domain tests have weak assertions; `app.Application` can be built with zero-value handlers.
+- [ ] GORM logger: treat `context.Canceled` as a non-error (`gorm_logger.go`).
+- [ ] `request_log_test.go:146`: the assertion that the real method is not logged is weak.
+- [ ] `path` field of the access log: revisit if a route with a sensitive path parameter is ever added.
+
+Manual checks pending:
+
+- [ ] Run against a real Postgres and confirm a failed insert logs only `$1, $2...` (nothing proves end to end that GORM applies `ParamsFilter`; integration tests were never run in this phase because Docker was off).
+- [ ] Run the `cloud` secrets path against real AWS Secrets Manager.
+- [ ] Run the commands in the README (`docker run` and `go run`), which were written but never executed.
+
+Housekeeping:
+
+- [ ] `odd/code-explanations.md` (Spanish study notes) is intentionally untracked; decide whether to commit it.
