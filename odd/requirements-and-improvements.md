@@ -19,7 +19,7 @@ The plan ([`plans/cards-api.md`](plans/cards-api.md)) holds the decisions; this 
 | Infra | Secrets Manager for credentials and salt | Designed (D12), built in T09 |
 | Infra | Basic logs and metrics in CloudWatch | Deferred |
 | Endpoint | `GET /health` with an instance identifier | Done in T06 (D7); wiring in T09 |
-| Deliverable | Simple architecture diagram | Pending |
+| Deliverable | Simple architecture diagram | Done: Mermaid diagram in `README.md` (target design, not deployed) |
 | Deliverable | Evidence of load distribution | Pending |
 
 ## B. Improvements already adopted

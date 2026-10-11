@@ -7,7 +7,7 @@ Check a box only after the outcome and its checks were observed. Record the comm
 
 ## Handoff (updated 2026-10-11)
 
-Status: T01 to T09 (including T06b and T06c), T11, T11b and T12 done: 14 of 15. Open: T10. Branch `feat/cards-api`, nothing pushed yet.
+Status: all 15 tasks done (T01 to T12, including T06b, T06c and T11b). Branch `feat/cards-api`, nothing pushed yet. Remaining work is in the deferred phases and the open review advisories.
 
 How to resume:
 
@@ -103,7 +103,7 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
 
 ## Phase 4 — Delivery of this stage
 
-- [ ] **T10 Developer docs**
+- [x] **T10 Developer docs**
   `README.md`: how to run, architecture summary, endpoints, deferred items, how AI was used (link to `odd/`).
   Commit: _pending_
 
