@@ -119,3 +119,33 @@ func TestRequestLog_LogsRawPathButNotQuery(t *testing.T) {
 		}
 	}
 }
+
+func TestRequestLog_StandardMethodsAreLoggedAsIs(t *testing.T) {
+	for _, method := range []string{
+		http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
+		http.MethodDelete, http.MethodHead, http.MethodOptions,
+	} {
+		t.Run(method, func(t *testing.T) {
+			line, _ := serve(t, method, "/cards/123456", "")
+
+			if line["method"] != method {
+				t.Errorf("method = %v, want %s", line["method"], method)
+			}
+		})
+	}
+}
+
+func TestRequestLog_UnusualMethodsAreLoggedAsOther(t *testing.T) {
+	for _, method := range []string{"FOO", "PROPFIND", "get"} {
+		t.Run(method, func(t *testing.T) {
+			line, output := serve(t, method, "/cards/123456", "")
+
+			if line["method"] != "OTHER" {
+				t.Errorf("method = %v, want OTHER", line["method"])
+			}
+			if strings.Contains(output, method+`"`) {
+				t.Errorf("real method leaked: %q", output)
+			}
+		})
+	}
+}

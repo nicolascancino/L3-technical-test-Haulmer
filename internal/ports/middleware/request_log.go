@@ -45,7 +45,7 @@ func RequestLog(logger *slog.Logger) func(http.Handler) http.Handler {
 
 			logger.LogAttrs(r.Context(), level, "request",
 				slog.String("request_id", RequestIDFromContext(r.Context())),
-				slog.String("method", r.Method),
+				slog.String("method", methodLabel(r.Method)),
 				slog.String("route", route),
 				slog.String("path", r.URL.Path),
 				slog.Int("status", status),
@@ -56,6 +56,17 @@ func RequestLog(logger *slog.Logger) func(http.Handler) http.Handler {
 			)
 		})
 	}
+}
+
+// methodLabel keeps the client-controlled method bounded, since it is also a
+// metric dimension and every new value would create a billable metric series.
+func methodLabel(method string) string {
+	switch method {
+	case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
+		http.MethodDelete, http.MethodHead, http.MethodOptions:
+		return method
+	}
+	return "OTHER"
 }
 
 func metricsDirective() map[string]any {

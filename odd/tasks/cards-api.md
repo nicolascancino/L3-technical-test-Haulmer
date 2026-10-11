@@ -119,6 +119,7 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Why: support can find a request from the id a client reports, or from the card id in the path. The client value is validated because it ends up in logs and responses.
   Front-end guidance: send its own `X-Request-Id` per user action, show `requestId` in error messages, and expose the header through `Access-Control-Expose-Headers` if the API is served cross-origin (CORS is not configured in this API yet).
   Check: middleware tests for valid, missing and invalid ids; request log tests for `path` and no query string; `NewHandler` tests for header, echo, `requestId` in the error body and the same id in the access log. Commit: 8112566.
+  Follow-up (review R3): the `method` log field and EMF dimension is bounded to the 7 standard methods plus `OTHER`, because the client controls the method and each new value would create a CloudWatch metric series; the real method of an unusual request is not logged. Commit: _pending_
 
 - [x] **T12 Route GORM logs through the configured slog logger**
   Pass the logger built in `main` (`internal/logging`) to `service.NewApplication` and set it on the GORM connection through a small adapter that implements `gorm.io/gorm/logger.Interface` over `*slog.Logger`, so every database log line shares format, level, fixed attributes and masking.
