@@ -105,7 +105,7 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
 
 - [x] **T10 Developer docs**
   `README.md`: how to run, architecture summary, endpoints, deferred items, how AI was used (link to `odd/`).
-  Commit: _pending_
+  Commit: 4edf5dd.
 
 - [x] **T11 Observability for CloudWatch**
   Structured JSON logs to stdout (`slog`), a request-logging middleware (method, route, status, latency, request id, never the PAN or `panHash`), and basic request metrics (count, latency, status) for CloudWatch.
