@@ -17,7 +17,7 @@ const (
 
 // RequestLog logs one line per request. The line doubles as a CloudWatch
 // Embedded Metric Format record, which CloudWatch only parses from JSON logs.
-// It logs the route pattern only, never the raw path, query or body.
+// It logs the route pattern and the raw path, never the query or body.
 func RequestLog(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -44,9 +44,10 @@ func RequestLog(logger *slog.Logger) func(http.Handler) http.Handler {
 			}
 
 			logger.LogAttrs(r.Context(), level, "request",
-				slog.String("request_id", chimw.GetReqID(r.Context())),
+				slog.String("request_id", RequestIDFromContext(r.Context())),
 				slog.String("method", r.Method),
 				slog.String("route", route),
+				slog.String("path", r.URL.Path),
 				slog.Int("status", status),
 				slog.String("status_class", statusClass),
 				slog.Int("requests", 1),

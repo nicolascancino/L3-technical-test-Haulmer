@@ -34,6 +34,7 @@ The plan ([`plans/cards-api.md`](plans/cards-api.md)) holds the decisions; this 
 - Single configuration entry point loaded at startup (D12).
 - Search keeps `last4` required, adds optional `brand`, `cardHolderName` (prefix), `expMonth`/`expYear` filters combined with AND, and `limit`/`cursor` pagination (D13).
 - The CVV is not requested or stored (it cannot be persisted after authorization and no rule needs it).
+- Request traceability: a validated `X-Request-Id` (client-provided or generated) is returned in the response header and the error body (`requestId`), and logged with the path, so support can find a request from the id a client reports.
 
 ## C. Optional improvements (to review once the project is finished)
 

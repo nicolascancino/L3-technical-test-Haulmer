@@ -109,7 +109,10 @@ type CreateCardRequest struct {
 // Error defines model for Error.
 type Error struct {
 	Message string `json:"message"`
-	Slug    string `json:"slug"`
+
+	// RequestId Identifier to quote when reporting a problem. Also returned in the `X-Request-Id` response header.
+	RequestId *string `json:"requestId,omitempty"`
+	Slug      string  `json:"slug"`
 }
 
 // Health defines model for Health.

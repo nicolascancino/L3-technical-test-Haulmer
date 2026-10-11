@@ -1,6 +1,7 @@
 package ports_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -380,5 +381,82 @@ func TestNewHandler_WrapperErrorsAreJSON(t *testing.T) {
 		if err := json.NewDecoder(rec.Body).Decode(&body); err != nil || body.Slug != "invalid_request" {
 			t.Errorf("%s: body = %+v, err = %v", target, body, err)
 		}
+	}
+}
+
+func newTracedHandler(reader *fakeReader) (http.Handler, *bytes.Buffer) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logs, nil))
+	application := app.Application{
+		Queries: app.Queries{GetCard: query.NewGetCardHandler(reader)},
+	}
+	return ports.NewHandler(application, "pod-1", logger), &logs
+}
+
+func TestNewHandler_ReturnsRequestIDHeader(t *testing.T) {
+	h, _ := newTracedHandler(&fakeReader{card: sampleCard})
+
+	rec := do(h, http.MethodGet, "/cards/card-1", "")
+
+	if rec.Header().Get("X-Request-Id") == "" {
+		t.Error("X-Request-Id header is empty")
+	}
+}
+
+func TestNewHandler_EchoesClientRequestID(t *testing.T) {
+	h, _ := newTracedHandler(&fakeReader{card: sampleCard})
+	req := httptest.NewRequest(http.MethodGet, "/cards/card-1", nil)
+	req.Header.Set("X-Request-Id", "client-42")
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("X-Request-Id"); got != "client-42" {
+		t.Errorf("X-Request-Id = %q", got)
+	}
+}
+
+func TestNewHandler_ErrorBodyCarriesRequestID(t *testing.T) {
+	tests := []struct {
+		name   string
+		target string
+		reader *fakeReader
+		status int
+	}{
+		{"domain error", "/cards/missing", &fakeReader{err: domain.ErrCardNotFound}, http.StatusNotFound},
+		{"wrapper error", "/cards?limit=abc", &fakeReader{}, http.StatusBadRequest},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h, _ := newTracedHandler(tt.reader)
+
+			rec := do(h, http.MethodGet, tt.target, "")
+
+			if rec.Code != tt.status {
+				t.Fatalf("status = %d, want %d; body = %s", rec.Code, tt.status, rec.Body)
+			}
+			var body ports.Error
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			header := rec.Header().Get("X-Request-Id")
+			if header == "" || body.RequestId == nil || *body.RequestId != header {
+				t.Errorf("requestId = %v, header = %q", body.RequestId, header)
+			}
+		})
+	}
+}
+
+func TestNewHandler_AccessLogCarriesSameRequestID(t *testing.T) {
+	h, logs := newTracedHandler(&fakeReader{card: sampleCard})
+
+	rec := do(h, http.MethodGet, "/cards/card-1", "")
+
+	var line map[string]any
+	if err := json.Unmarshal(logs.Bytes(), &line); err != nil {
+		t.Fatalf("log output %q: %v", logs, err)
+	}
+	if line["request_id"] != rec.Header().Get("X-Request-Id") || line["path"] != "/cards/card-1" || line["route"] != "/cards/{id}" {
+		t.Errorf("log line = %v", line)
 	}
 }

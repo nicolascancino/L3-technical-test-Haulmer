@@ -7,7 +7,7 @@ Check a box only after the outcome and its checks were observed. Record the comm
 
 ## Handoff (updated 2026-10-10)
 
-Status: T01 to T09 (including T06b and T06c) and T11 done: 12 of 14. Open: T10, T12. Branch `feat/cards-api`, nothing pushed yet.
+Status: T01 to T09 (including T06b and T06c), T11 and T11b done: 13 of 15. Open: T10, T12. Branch `feat/cards-api`, nothing pushed yet.
 
 How to resume:
 
@@ -113,6 +113,12 @@ Workflow reminders: generate API code with `./scripts/openapi-http.sh cards inte
   Step 1 done (human-approved): `log/slog` logger built once in `main` and injected (`internal/logging`), `TextHandler` or `JSONHandler` by `LOG_FORMAT`, `LOG_LEVEL`, fixed attributes `service`/`env`/`instance`, UTC RFC3339 time, masking of sensitive keys (also in groups), source only at debug. No new dependency.
   Step 2 done: request id (chi `RequestID`) and request log with latency in `internal/ports/middleware`, registered on the router in `ports.NewHandler` (not in `ChiServerOptions`) so unmatched routes (404) are logged too. Route pattern only, never raw path, query or body; `/health` logs at debug, 5xx at error. RED metrics (requests, latency_ms; dimensions method, route, status_class) go through CloudWatch Embedded Metric Format in the same log line (`_aws`), no SDK; they are only meaningful with `LOG_FORMAT=json` (default in cloud).
   Check: logs and metrics emitted by a handler test; no card data in any log line. Commit: 5afb510 (step 2).
+
+- [x] **T11b Request traceability**
+  `internal/ports/middleware.RequestID` replaces chi's `RequestID`: it accepts the incoming `X-Request-Id` only when it is 1 to 64 characters of letters, digits, dot, underscore or hyphen, and generates a UUID otherwise. The id is returned in the `X-Request-Id` response header, in the `requestId` field of every error body (contract updated in `api/openapi/cards.yml`) and in the request log, which now also carries the raw `path` (a plain field, not an EMF dimension; the query string is never logged).
+  Why: support can find a request from the id a client reports, or from the card id in the path. The client value is validated because it ends up in logs and responses.
+  Front-end guidance: send its own `X-Request-Id` per user action, show `requestId` in error messages, and expose the header through `Access-Control-Expose-Headers` if the API is served cross-origin (CORS is not configured in this API yet).
+  Check: middleware tests for valid, missing and invalid ids; request log tests for `path` and no query string; `NewHandler` tests for header, echo, `requestId` in the error body and the same id in the access log. Commit: _pending_
 
 - [ ] **T12 Route GORM logs through the configured slog logger**
   Pass the logger built in `main` (`internal/logging`) to `service.NewApplication` and set it on the GORM connection through a small adapter that implements `gorm.io/gorm/logger.Interface` over `*slog.Logger`, so every database log line shares format, level, fixed attributes and masking.

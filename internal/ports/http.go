@@ -9,7 +9,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
-	chimw "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/app"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/app/command"
@@ -44,10 +43,10 @@ func (h HttpServer) CreateCard(w http.ResponseWriter, r *http.Request) {
 	if err := dec.Decode(&body); err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
-			writeError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "request body exceeds the 1 MiB limit")
+			writeError(w, r, http.StatusRequestEntityTooLarge, "payload_too_large", "request body exceeds the 1 MiB limit")
 			return
 		}
-		writeError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON")
+		writeError(w, r, http.StatusBadRequest, "invalid_json", "request body is not valid JSON")
 		return
 	}
 
@@ -84,7 +83,7 @@ func (h HttpServer) GetCard(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 func (h HttpServer) ListCards(w http.ResponseWriter, r *http.Request, params ListCardsParams) {
-	limit, cursor, ok := pageParams(w, params.Limit, params.Cursor)
+	limit, cursor, ok := pageParams(w, r, params.Limit, params.Cursor)
 	if !ok {
 		return
 	}
@@ -98,11 +97,11 @@ func (h HttpServer) ListCards(w http.ResponseWriter, r *http.Request, params Lis
 }
 
 func (h HttpServer) SearchCards(w http.ResponseWriter, r *http.Request, params SearchCardsParams) {
-	filter, ok := searchFilter(w, params)
+	filter, ok := searchFilter(w, r, params)
 	if !ok {
 		return
 	}
-	limit, cursor, ok := pageParams(w, params.Limit, params.Cursor)
+	limit, cursor, ok := pageParams(w, r, params.Limit, params.Cursor)
 	if !ok {
 		return
 	}
@@ -119,13 +118,13 @@ func (h HttpServer) GetHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, Health{Status: "ok", Instance: h.instance})
 }
 
-func pageParams(w http.ResponseWriter, limitParam *int, cursorParam *string) (limit int, cursor string, ok bool) {
+func pageParams(w http.ResponseWriter, r *http.Request, limitParam *int, cursorParam *string) (limit int, cursor string, ok bool) {
 	limit = defaultLimit
 	if limitParam != nil {
 		limit = *limitParam
 	}
 	if limit < 1 || limit > maxLimit {
-		writeError(w, http.StatusBadRequest, "invalid_limit", "limit must be between 1 and 100")
+		writeError(w, r, http.StatusBadRequest, "invalid_limit", "limit must be between 1 and 100")
 		return 0, "", false
 	}
 	if cursorParam != nil {
@@ -134,15 +133,15 @@ func pageParams(w http.ResponseWriter, limitParam *int, cursorParam *string) (li
 	return limit, cursor, true
 }
 
-func searchFilter(w http.ResponseWriter, params SearchCardsParams) (query.CardFilter, bool) {
+func searchFilter(w http.ResponseWriter, r *http.Request, params SearchCardsParams) (query.CardFilter, bool) {
 	filter := query.CardFilter{Last4: params.Last4}
 	if !isLast4(params.Last4) {
-		writeError(w, http.StatusBadRequest, "invalid_last4", domain.ErrInvalidLast4.Error())
+		writeError(w, r, http.StatusBadRequest, "invalid_last4", domain.ErrInvalidLast4.Error())
 		return filter, false
 	}
 	if params.Brand != nil {
 		if !params.Brand.Valid() {
-			writeError(w, http.StatusBadRequest, "invalid_brand", "brand must be one of visa, mastercard, amex, discover, diners, jcb, unknown")
+			writeError(w, r, http.StatusBadRequest, "invalid_brand", "brand must be one of visa, mastercard, amex, discover, diners, jcb, unknown")
 			return filter, false
 		}
 		filter.Brand = string(*params.Brand)
@@ -150,21 +149,21 @@ func searchFilter(w http.ResponseWriter, params SearchCardsParams) (query.CardFi
 	if params.CardHolderName != nil {
 		name := strings.TrimSpace(*params.CardHolderName)
 		if name == "" || utf8.RuneCountInString(name) > maxCardHolderNameFilter {
-			writeError(w, http.StatusBadRequest, "invalid_card_holder_name", "cardHolderName must be non-blank and at most 100 characters")
+			writeError(w, r, http.StatusBadRequest, "invalid_card_holder_name", "cardHolderName must be non-blank and at most 100 characters")
 			return filter, false
 		}
 		filter.CardHolderName = name
 	}
 	if params.ExpMonth != nil {
 		if *params.ExpMonth < 1 || *params.ExpMonth > 12 {
-			writeError(w, http.StatusBadRequest, "invalid_exp_month", "expMonth must be between 1 and 12")
+			writeError(w, r, http.StatusBadRequest, "invalid_exp_month", "expMonth must be between 1 and 12")
 			return filter, false
 		}
 		filter.ExpMonth = *params.ExpMonth
 	}
 	if params.ExpYear != nil {
 		if *params.ExpYear < 1 || *params.ExpYear > 9999 {
-			writeError(w, http.StatusBadRequest, "invalid_exp_year", "expYear must be between 1 and 9999")
+			writeError(w, r, http.StatusBadRequest, "invalid_exp_year", "expYear must be between 1 and 9999")
 			return filter, false
 		}
 		filter.ExpYear = *params.ExpYear
@@ -211,27 +210,28 @@ func toCards(cards []query.Card) []Card {
 func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, domain.ErrInvalidPAN):
-		writeError(w, http.StatusUnprocessableEntity, "invalid_pan", domain.ErrInvalidPAN.Error())
+		writeError(w, r, http.StatusUnprocessableEntity, "invalid_pan", domain.ErrInvalidPAN.Error())
 	case errors.Is(err, domain.ErrCardHolderNameRequired):
-		writeError(w, http.StatusUnprocessableEntity, "card_holder_name_required", domain.ErrCardHolderNameRequired.Error())
+		writeError(w, r, http.StatusUnprocessableEntity, "card_holder_name_required", domain.ErrCardHolderNameRequired.Error())
 	case errors.Is(err, domain.ErrInvalidExpiry):
-		writeError(w, http.StatusUnprocessableEntity, "invalid_expiry", domain.ErrInvalidExpiry.Error())
+		writeError(w, r, http.StatusUnprocessableEntity, "invalid_expiry", domain.ErrInvalidExpiry.Error())
 	case errors.Is(err, domain.ErrCardExpired):
-		writeError(w, http.StatusUnprocessableEntity, "card_expired", domain.ErrCardExpired.Error())
+		writeError(w, r, http.StatusUnprocessableEntity, "card_expired", domain.ErrCardExpired.Error())
 	case errors.Is(err, domain.ErrCardNotFound):
-		writeError(w, http.StatusNotFound, "card_not_found", domain.ErrCardNotFound.Error())
+		writeError(w, r, http.StatusNotFound, "card_not_found", domain.ErrCardNotFound.Error())
 	case errors.Is(err, domain.ErrCardAlreadyExists):
-		writeError(w, http.StatusConflict, "card_already_exists", domain.ErrCardAlreadyExists.Error())
+		writeError(w, r, http.StatusConflict, "card_already_exists", domain.ErrCardAlreadyExists.Error())
 	case errors.Is(err, domain.ErrInvalidCursor):
-		writeError(w, http.StatusBadRequest, "invalid_cursor", domain.ErrInvalidCursor.Error())
+		writeError(w, r, http.StatusBadRequest, "invalid_cursor", domain.ErrInvalidCursor.Error())
 	default:
-		slog.ErrorContext(r.Context(), "unexpected error", "request_id", chimw.GetReqID(r.Context()), "error", err)
-		writeError(w, http.StatusInternalServerError, "internal", "internal error")
+		slog.ErrorContext(r.Context(), "unexpected error", "request_id", middleware.RequestIDFromContext(r.Context()), "error", err)
+		writeError(w, r, http.StatusInternalServerError, "internal", "internal error")
 	}
 }
 
-func writeError(w http.ResponseWriter, status int, slug, message string) {
-	writeJSON(w, status, Error{Slug: slug, Message: message})
+func writeError(w http.ResponseWriter, r *http.Request, status int, slug, message string) {
+	requestID := middleware.RequestIDFromContext(r.Context())
+	writeJSON(w, status, Error{Slug: slug, Message: message, RequestId: &requestID})
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -246,11 +246,11 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 // Middleware is registered on the router, not in ChiServerOptions, so unmatched routes are logged too.
 func NewHandler(application app.Application, instance string, logger *slog.Logger) http.Handler {
 	router := chi.NewRouter()
-	router.Use(chimw.RequestID, middleware.RequestLog(logger))
+	router.Use(middleware.RequestID, middleware.RequestLog(logger))
 	return HandlerWithOptions(NewHttpServer(application, instance), ChiServerOptions{
 		BaseRouter: router,
-		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
-			writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			writeError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
 		},
 	})
 }

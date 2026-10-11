@@ -2,7 +2,12 @@ openapi: "3.0.0"
 info:
   version: 1.0.0
   title: Cards API
-  description: Create and query credit cards. Responses never include the full PAN.
+  description: |
+    Create and query credit cards. Responses never include the full PAN.
+
+    Every response carries an `X-Request-Id` header. A client may send its own `X-Request-Id`
+    (1 to 64 characters: letters, digits, dot, underscore or hyphen); otherwise the server generates one.
+    Quote it when reporting a problem.
 paths:
   /cards:
     post:
@@ -215,3 +220,6 @@ components:
       properties:
         slug: { type: string }
         message: { type: string }
+        requestId:
+          type: string
+          description: Identifier to quote when reporting a problem. Also returned in the `X-Request-Id` response header.

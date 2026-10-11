@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	chimw "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/config"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/logging"
@@ -23,7 +22,7 @@ func serve(t *testing.T, method, target, body string) (statusLog map[string]any,
 	logger := logging.New(&buf, logging.Options{Level: slog.LevelInfo, Format: config.LogJSON, Env: config.Cloud, Instance: "test"})
 
 	router := chi.NewRouter()
-	router.Use(chimw.RequestID, middleware.RequestLog(logger))
+	router.Use(middleware.RequestID, middleware.RequestLog(logger))
 	router.Get("/cards/{id}", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	router.Post("/cards", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusCreated) })
 	router.Get("/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
@@ -101,5 +100,22 @@ func TestRequestLog_NeverLogsRequestBody(t *testing.T) {
 
 	if output == "" || strings.Contains(output, "4111111111111111") {
 		t.Errorf("output = %q", output)
+	}
+}
+
+func TestRequestLog_LogsRawPathButNotQuery(t *testing.T) {
+	line, output := serve(t, http.MethodGet, "/cards/123456?secret=1", "")
+
+	if line["path"] != "/cards/123456" || line["route"] != "/cards/{id}" {
+		t.Errorf("path/route = %v/%v", line["path"], line["route"])
+	}
+	if strings.Contains(output, "secret") {
+		t.Errorf("query string leaked: %q", output)
+	}
+	dimensions := line["_aws"].(map[string]any)["CloudWatchMetrics"].([]any)[0].(map[string]any)["Dimensions"].([]any)[0].([]any)
+	for _, d := range dimensions {
+		if d == "path" {
+			t.Error("path must not be an EMF dimension")
+		}
 	}
 }
