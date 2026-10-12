@@ -110,6 +110,8 @@ APP_ENV=local DB_HOST=localhost DB_NAME=cards DB_USER=postgres DB_PASSWORD=dev \
 
 The schema is created on startup. The API listens on `PORT` (default `8080`).
 
+`make run` does the same in one step (starts the database and the API with a local configuration, for example to try it from Postman) and `make down` removes the database and its data.
+
 ### Configuration
 
 All settings come from environment variables, read once at startup. Missing required values stop the process.
@@ -154,9 +156,9 @@ go test -tags integration ./internal/adapters/repository/   # needs Docker
 
 | Item | State |
 | :--- | :---- |
-| Brand detection | Visa, Mastercard and American Express by prefix and length; any other PAN is `unknown` |
+| Brand detection for Discover, Diners Club and JCB | Only Visa, Mastercard and American Express are detected; any other PAN is `unknown` |
 | Reversible PAN storage | Not needed by any endpoint; proposal in `odd/requirements-and-improvements.md` (C13) |
-| Dockerfile, ECS Fargate service, load balancer, RDS | Target design, not deployed |
+| Dockerfile, ECS Fargate service, load balancer, RDS | Target design, not deployed; only `docker-compose.yml` for the local database exists |
 
 ## How this was built
 
