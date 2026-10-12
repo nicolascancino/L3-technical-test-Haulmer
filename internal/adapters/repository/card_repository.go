@@ -24,7 +24,7 @@ func NewCardRepository(db *gorm.DB) CardRepository {
 }
 
 func (r CardRepository) AddCard(ctx context.Context, c *domain.Card) error {
-	row, err := toRow(c)
+	row, err := toTable(c)
 	if err != nil {
 		return err
 	}
@@ -35,15 +35,15 @@ func (r CardRepository) AddCard(ctx context.Context, c *domain.Card) error {
 	return err
 }
 
-func findCardRow(ctx context.Context, db *gorm.DB, id domain.CardID) (tables.CardRow, error) {
+func (r CardRepository) findCard(ctx context.Context, id domain.CardID) (tables.Card, error) {
 	uid, err := parseCardID(id)
 	if err != nil {
-		return tables.CardRow{}, err
+		return tables.Card{}, err
 	}
-	var row tables.CardRow
-	err = db.WithContext(ctx).Where("id = ?", uid).Take(&row).Error
+	var row tables.Card
+	err = r.db.WithContext(ctx).Where("id = ?", uid).Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return tables.CardRow{}, fmt.Errorf("%w: %s", domain.ErrCardNotFound, id)
+		return tables.Card{}, fmt.Errorf("%w: %s", domain.ErrCardNotFound, id)
 	}
 	return row, err
 }

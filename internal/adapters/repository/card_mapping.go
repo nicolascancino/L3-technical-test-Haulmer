@@ -10,12 +10,12 @@ import (
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/domain"
 )
 
-func toRow(c *domain.Card) (tables.CardRow, error) {
+func toTable(c *domain.Card) (tables.Card, error) {
 	id, err := parseCardID(c.ID())
 	if err != nil {
-		return tables.CardRow{}, err
+		return tables.Card{}, err
 	}
-	return tables.CardRow{
+	return tables.Card{
 		ID:             id.String(),
 		CardHolderName: c.CardHolderName(),
 		Brand:          string(c.Brand()),
@@ -28,7 +28,7 @@ func toRow(c *domain.Card) (tables.CardRow, error) {
 	}, nil
 }
 
-func toQueryCard(r tables.CardRow) query.Card {
+func toQueryCard(r tables.Card) query.Card {
 	return query.Card{
 		ID:             r.ID,
 		Last4:          r.Last4,

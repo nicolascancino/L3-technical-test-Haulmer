@@ -19,7 +19,7 @@ func escapeLike(s string) string {
 }
 
 func (r CardRepository) GetCard(ctx context.Context, id domain.CardID) (query.Card, error) {
-	row, err := findCardRow(ctx, r.db, id)
+	row, err := r.findCard(ctx, id)
 	if err != nil {
 		return query.Card{}, err
 	}
@@ -27,11 +27,11 @@ func (r CardRepository) GetCard(ctx context.Context, id domain.CardID) (query.Ca
 }
 
 func (r CardRepository) ListCards(ctx context.Context, limit int, cursor string) (query.CardPage, error) {
-	return r.page(ctx, r.db.Model(&tables.CardRow{}), limit, cursor)
+	return r.page(ctx, r.db.Model(&tables.Card{}), limit, cursor)
 }
 
 func (r CardRepository) SearchCards(ctx context.Context, filter query.CardFilter, limit int, cursor string) (query.CardPage, error) {
-	q := r.db.Model(&tables.CardRow{}).Where("last4 = ?", filter.Last4)
+	q := r.db.Model(&tables.Card{}).Where("last4 = ?", filter.Last4)
 	if filter.Brand != "" {
 		q = q.Where("brand = ?", filter.Brand)
 	}
@@ -67,7 +67,7 @@ func (r CardRepository) page(ctx context.Context, q *gorm.DB, limit int, token s
 		q = q.Where("id > ?", after)
 	}
 
-	var rows []tables.CardRow
+	rows := make([]tables.Card, 0)
 	err := q.WithContext(ctx).Order("id").Limit(limit + 1).Find(&rows).Error
 	if err != nil {
 		return query.CardPage{}, err

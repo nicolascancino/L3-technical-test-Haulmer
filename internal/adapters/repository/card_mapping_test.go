@@ -11,7 +11,7 @@ import (
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/domain"
 )
 
-func TestToRow(t *testing.T) {
+func TestToTable(t *testing.T) {
 	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 	card, err := domain.NewCard(domain.NewCardConfig{
 		ID:             domain.CardID(uuid.Must(uuid.NewV7()).String()),
@@ -26,12 +26,12 @@ func TestToRow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	row, err := toRow(card)
+	row, err := toTable(card)
 	if err != nil {
-		t.Fatalf("toRow: %v", err)
+		t.Fatalf("toTable: %v", err)
 	}
 
-	want := tables.CardRow{
+	want := tables.Card{
 		ID:             string(card.ID()),
 		CardHolderName: "Ada Lovelace",
 		Brand:          string(card.Brand()),
@@ -59,7 +59,7 @@ func TestToQueryCardReturnsUTC(t *testing.T) {
 	santiago := time.FixedZone("UTC-3", -3*60*60)
 	local := time.Date(2026, 10, 10, 9, 0, 0, 0, santiago)
 
-	got := toQueryCard(tables.CardRow{CreatedAt: local, UpdatedAt: local})
+	got := toQueryCard(tables.Card{CreatedAt: local, UpdatedAt: local})
 
 	for name, ts := range map[string]time.Time{"created": got.CreatedAt, "updated": got.UpdatedAt} {
 		if ts.Location() != time.UTC || !ts.Equal(local) {
