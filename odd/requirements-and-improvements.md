@@ -58,3 +58,14 @@ Idempotency:
 - **C11** Reject an `Idempotency-Key` longer than a sane limit (for example 255 characters). The generated server does not enforce `minLength` or `maxLength`, and a very long key only fails when it reaches the unique index.
 - **C12** Return `422` when an `Idempotency-Key` is reused with a different card (compare the stored `pan_hash`, or a hash of the whole request) instead of returning the original card.
 - **C10** Expire idempotency keys (for example after 24 hours) with a periodic cleanup, or a TTL if C9 is adopted.
+
+Reversible PAN storage:
+
+- **C13** Store the PAN so it can be returned later, only if a flow needs it (charging, showing it to an authorized user). The hash stays for duplicate detection. Options, from simplest to strongest:
+  - **Envelope encryption with AWS KMS**: encrypt the PAN with a data key from KMS (`GenerateDataKey`), store the ciphertext and the encrypted data key in a `pan_encrypted` column, and decrypt only through `kms:Decrypt`. IAM and the KMS key policy decide who can decrypt, and CloudTrail audits every use. Rotate the KMS key periodically.
+  - **Tokenization**: keep the PAN in a separate, restricted vault (its own database and service) and store only an opaque token in `cards`. The cards service and its logs never see the PAN, which also shrinks the PCI DSS scope. It costs one more service to run.
+  - **A payment provider vault** (Stripe, Adyen or similar): the PAN never reaches this system. This is the usual answer when PCI DSS compliance is a goal.
+
+  Rules for any option: add a dedicated endpoint (for example `POST /cards/{id}/reveal`) protected by authentication and authorization, never include the PAN in the normal `Card` response, never log it, and never store the CVV.
+
+  Envelope encryption flow (KMS option): on `POST /cards`, ask KMS for a data key (`GenerateDataKey`), encrypt the PAN with the plaintext key using AES-GCM, store the ciphertext and the encrypted data key, and discard the plaintext key. To read it back, send the encrypted data key to KMS (`Decrypt`), decrypt the PAN with the returned key and discard it. In code this is a `PANCipher` port in the domain with a `KMSPANCipher` adapter. `POST /cards` keeps its contract and only adds the encryption step internally; `GET /cards/{id}` never returns the PAN; recovery goes through the dedicated endpoint, which needs authentication first (the API has none today).

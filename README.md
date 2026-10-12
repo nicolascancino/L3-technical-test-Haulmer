@@ -146,6 +146,7 @@ go test -tags integration ./internal/adapters/repository/   # needs Docker
 ## Security notes
 
 - The PAN is never stored in clear text or returned. Only `last4`, `brand` and `panHash` (`HMAC-SHA256(pan, salt)`) are kept, and `panHash` is used to reject duplicates.
+- Storing only the one-way HMAC is the chosen way to store the PAN securely: no endpoint needs the full PAN back, and the key is kept outside the database, so a database leak alone does not allow guessing PANs against the hashes. Recovering the PAN would need reversible storage, described as improvement C13 in [`odd/requirements-and-improvements.md`](odd/requirements-and-improvements.md).
 - The CVV is never requested or stored.
 - In `cloud`, the database password and the salt come from AWS Secrets Manager; a missing or blank secret stops startup.
 
@@ -154,7 +155,7 @@ go test -tags integration ./internal/adapters/repository/   # needs Docker
 | Item | State |
 | :--- | :---- |
 | Brand detection | Visa, Mastercard and American Express by prefix and length; any other PAN is `unknown` |
-| Reversible PAN storage | Under research; only the one-way hash exists |
+| Reversible PAN storage | Not needed by any endpoint; proposal in `odd/requirements-and-improvements.md` (C13) |
 | Dockerfile, ECS Fargate service, load balancer, RDS | Target design, not deployed |
 
 ## How this was built

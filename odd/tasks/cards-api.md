@@ -135,7 +135,7 @@ Deferred phases:
 
 - [x] **Luhn and expiry**: `validatePAN` (12 to 19 digits, Luhn) and `validateExpiry` are implemented with domain tests.
 - [x] **Brand detection**: `detectBrand` recognizes Visa, Mastercard and Amex by prefix and length; other networks (Discover, Diners, JCB) stay `unknown`.
-- [ ] **Secure PAN storage**: only the one-way `panHash` exists; reversible storage (KMS encryption or tokenization) is under research by the human.
+- [x] **Secure PAN storage**: only the one-way HMAC `panHash` and `last4` are stored; no endpoint returns the PAN. Reversible storage is documented as improvement C13.
 - [x] **Idempotency** by `Idempotency-Key` (unique column on `cards`; plan section 5 and D3).
 - [ ] **Dockerfile, ECS Fargate task definition and service, load balancer, RDS, AWS deployment** (target design is in the README diagram).
 
