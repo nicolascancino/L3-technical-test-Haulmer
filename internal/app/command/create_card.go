@@ -36,7 +36,9 @@ func NewCreateCardHandler(repo domain.CardRepository, hasher PANHasher) CreateCa
 }
 
 func (h CreateCardHandler) Handle(ctx context.Context, cmd CreateCard) (*domain.Card, error) {
-	panHash, err := h.hasher.Hash(cmd.PAN)
+	pan := domain.NormalizePAN(cmd.PAN)
+
+	panHash, err := h.hasher.Hash(pan)
 	if err != nil {
 		return nil, fmt.Errorf("hash pan: %w", err)
 	}
@@ -48,7 +50,7 @@ func (h CreateCardHandler) Handle(ctx context.Context, cmd CreateCard) (*domain.
 
 	card, err := domain.NewCard(domain.NewCardConfig{
 		ID:             domain.CardID(id.String()),
-		PAN:            cmd.PAN,
+		PAN:            pan,
 		ExpMonth:       cmd.ExpMonth,
 		ExpYear:        cmd.ExpYear,
 		CardHolderName: cmd.CardHolderName,

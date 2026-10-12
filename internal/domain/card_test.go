@@ -8,6 +8,37 @@ import (
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/domain"
 )
 
+func TestNormalizePAN(t *testing.T) {
+	tests := map[string]string{
+		"4111111111111111":        "4111111111111111",
+		"4111 1111 1111 1111":     "4111111111111111",
+		"4111-1111-1111-1111":     "4111111111111111",
+		" 4111 - 1111 1111-1111 ": "4111111111111111",
+		"41111111111a1111":        "41111111111a1111",
+	}
+	for raw, want := range tests {
+		if got := domain.NormalizePAN(raw); got != want {
+			t.Errorf("NormalizePAN(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}
+
+func TestNewCard_AcceptsPANLengthBounds(t *testing.T) {
+	now := time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)
+	for pan, last4 := range map[string]string{"400000000002": "0002", "4030000000000000003": "0003"} {
+		card, err := domain.NewCard(domain.NewCardConfig{
+			ID: "card-1", PAN: pan, ExpMonth: 12, ExpYear: 2030, CreatedAt: now,
+			CardHolderName: "Ada Lovelace", PANHash: "hash-1",
+		})
+		if err != nil {
+			t.Fatalf("%d-digit pan: unexpected error: %v", len(pan), err)
+		}
+		if card.Last4() != last4 {
+			t.Errorf("%d-digit pan: last4 = %q, want %q", len(pan), card.Last4(), last4)
+		}
+	}
+}
+
 func TestNewCard(t *testing.T) {
 	now := time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)
 	valid := domain.NewCardConfig{
@@ -26,6 +57,19 @@ func TestNewCard(t *testing.T) {
 		{name: "pan too short", mutate: func(c *domain.NewCardConfig) { c.PAN = "123" }, wantErr: domain.ErrInvalidPAN},
 		{name: "blank holder name", mutate: func(c *domain.NewCardConfig) { c.CardHolderName = "   " }, wantErr: domain.ErrCardHolderNameRequired},
 		{name: "missing pan hash", mutate: func(c *domain.NewCardConfig) { c.PANHash = "" }, wantErr: domain.ErrPANHashRequired},
+		{name: "month zero", mutate: func(c *domain.NewCardConfig) { c.ExpMonth = 0 }, wantErr: domain.ErrInvalidExpiry},
+		{name: "month thirteen", mutate: func(c *domain.NewCardConfig) { c.ExpMonth = 13 }, wantErr: domain.ErrInvalidExpiry},
+		{name: "two digit year", mutate: func(c *domain.NewCardConfig) { c.ExpYear = 30 }, wantErr: domain.ErrInvalidExpiry},
+		{name: "five digit year", mutate: func(c *domain.NewCardConfig) { c.ExpYear = 10000 }, wantErr: domain.ErrInvalidExpiry},
+		{name: "expires this month", mutate: func(c *domain.NewCardConfig) { c.ExpMonth, c.ExpYear = 10, 2026 }},
+		{name: "expired last month", mutate: func(c *domain.NewCardConfig) { c.ExpMonth, c.ExpYear = 9, 2026 }, wantErr: domain.ErrCardExpired},
+		{name: "expired last year", mutate: func(c *domain.NewCardConfig) { c.ExpMonth, c.ExpYear = 12, 2025 }, wantErr: domain.ErrCardExpired},
+		{name: "earlier month next year", mutate: func(c *domain.NewCardConfig) { c.ExpMonth, c.ExpYear = 1, 2027 }},
+		{name: "pan fails luhn", mutate: func(c *domain.NewCardConfig) { c.PAN = "4111111111111112" }, wantErr: domain.ErrInvalidPAN},
+		{name: "pan with letters", mutate: func(c *domain.NewCardConfig) { c.PAN = "41111111111a1111" }, wantErr: domain.ErrInvalidPAN},
+		{name: "pan with spaces is not normalized here", mutate: func(c *domain.NewCardConfig) { c.PAN = "4111 1111 1111 1111" }, wantErr: domain.ErrInvalidPAN},
+		{name: "pan 11 digits", mutate: func(c *domain.NewCardConfig) { c.PAN = "40000000006" }, wantErr: domain.ErrInvalidPAN},
+		{name: "pan 20 digits", mutate: func(c *domain.NewCardConfig) { c.PAN = "40300000000000000003" }, wantErr: domain.ErrInvalidPAN},
 	}
 
 	for _, tt := range tests {

@@ -128,6 +128,26 @@ func TestCreateCardHandler_Handle(t *testing.T) {
 	}
 }
 
+func TestCreateCardHandler_Handle_NormalizesPANBeforeHashing(t *testing.T) {
+	for _, pan := range []string{"4111 1111 1111 1111", "4111-1111-1111-1111"} {
+		repo := &fakeRepo{}
+		hasher := &fakeHasher{}
+		h := command.NewCreateCardHandler(repo, hasher)
+
+		_, err := h.Handle(context.Background(), command.CreateCard{PAN: pan, CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030})
+
+		if err != nil {
+			t.Fatalf("%q: unexpected error: %v", pan, err)
+		}
+		if hasher.gotPAN != "4111111111111111" {
+			t.Errorf("%q: hashed %q, want the digits only", pan, hasher.gotPAN)
+		}
+		if repo.added[0].Last4() != "1111" {
+			t.Errorf("%q: last4 = %q, want 1111", pan, repo.added[0].Last4())
+		}
+	}
+}
+
 func TestCreateCardHandler_Handle_GeneratesDistinctIDs(t *testing.T) {
 	h := command.NewCreateCardHandler(&fakeRepo{}, &fakeHasher{})
 	cmd := command.CreateCard{PAN: "4111111111111111", CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030}

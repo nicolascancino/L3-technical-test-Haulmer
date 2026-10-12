@@ -63,10 +63,6 @@ func NewCard(cfg NewCardConfig) (*Card, error) {
 	if err := validatePAN(cfg.PAN); err != nil {
 		return nil, err
 	}
-	// Guards the slice below while validatePAN is still a stub.
-	if len(cfg.PAN) < last4Length {
-		return nil, ErrInvalidPAN
-	}
 	if err := validateExpiry(cfg.ExpMonth, cfg.ExpYear, cfg.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -120,13 +116,46 @@ func UnmarshalCardFromDatabase(
 	}, nil
 }
 
-// TODO: Luhn check; signature only, currently accepts any value.
+// NormalizePAN must run before hashing, so the same card always yields the same hash.
+func NormalizePAN(raw string) string {
+	return strings.NewReplacer(" ", "", "-", "").Replace(raw)
+}
+
 func validatePAN(pan string) error {
+	if len(pan) < 12 || len(pan) > 19 {
+		return ErrInvalidPAN
+	}
+	sum := 0
+	double := false
+	for i := len(pan) - 1; i >= 0; i-- {
+		if pan[i] < '0' || pan[i] > '9' {
+			return ErrInvalidPAN
+		}
+		digit := int(pan[i] - '0')
+		if double {
+			digit *= 2
+			if digit > 9 {
+				digit -= 9
+			}
+		}
+		sum += digit
+		double = !double
+	}
+	if sum%10 != 0 {
+		return ErrInvalidPAN
+	}
 	return nil
 }
 
-// TODO: month range and past-expiry check; signature only, currently accepts any value.
+// A card stays valid through the last day of its expiry month.
 func validateExpiry(month, year int, now time.Time) error {
+	if month < 1 || month > 12 || year < 1000 || year > 9999 {
+		return ErrInvalidExpiry
+	}
+	now = now.UTC()
+	if year < now.Year() || (year == now.Year() && month < int(now.Month())) {
+		return ErrCardExpired
+	}
 	return nil
 }
 
