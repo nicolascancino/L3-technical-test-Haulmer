@@ -10,6 +10,7 @@ type Card struct {
 	Last4          string    `gorm:"column:last4;type:char(4);not null"`
 	ExpMonth       int       `gorm:"column:exp_month;not null"`
 	ExpYear        int       `gorm:"column:exp_year;not null"`
+	IdempotencyKey string    `gorm:"column:idempotency_key"`
 	CreatedAt      time.Time `gorm:"column:created_at;not null"`
 	UpdatedAt      time.Time `gorm:"column:updated_at;not null"`
 }

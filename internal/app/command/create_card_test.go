@@ -15,14 +15,21 @@ import (
 type fakeRepo struct {
 	added  []*domain.Card
 	addErr error
+	gotKey string
+	// stored is returned instead of the new card, as the repository does on a replayed key.
+	stored *domain.Card
 }
 
-func (r *fakeRepo) AddCard(_ context.Context, c *domain.Card) error {
+func (r *fakeRepo) AddCard(_ context.Context, key string, c *domain.Card) (*domain.Card, error) {
+	r.gotKey = key
 	if r.addErr != nil {
-		return r.addErr
+		return nil, r.addErr
 	}
 	r.added = append(r.added, c)
-	return nil
+	if r.stored != nil {
+		return r.stored, nil
+	}
+	return c, nil
 }
 
 var errHash = errors.New("hash failure")
@@ -41,7 +48,7 @@ func (h *fakeHasher) Hash(pan string) (string, error) {
 }
 
 func TestCreateCardHandler_Handle(t *testing.T) {
-	valid := command.CreateCard{PAN: "4111111111111111", CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030}
+	valid := command.CreateCard{IdempotencyKey: "key-1", PAN: "4111111111111111", CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030}
 
 	tests := []struct {
 		name    string
@@ -53,12 +60,17 @@ func TestCreateCardHandler_Handle(t *testing.T) {
 		{name: "stores the card", cmd: valid},
 		{
 			name:    "domain validation error is returned and nothing is stored",
-			cmd:     command.CreateCard{PAN: "123", CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030},
+			cmd:     command.CreateCard{IdempotencyKey: "key-1", PAN: "123", CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030},
 			wantErr: domain.ErrInvalidPAN,
 		},
 		{
+			name:    "blank idempotency key is rejected",
+			cmd:     command.CreateCard{IdempotencyKey: "  ", PAN: "4111111111111111", CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030},
+			wantErr: domain.ErrIdempotencyKeyRequired,
+		},
+		{
 			name:    "blank holder name is rejected",
-			cmd:     command.CreateCard{PAN: "4111111111111111", CardHolderName: "  ", ExpMonth: 12, ExpYear: 2030},
+			cmd:     command.CreateCard{IdempotencyKey: "key-1", PAN: "4111111111111111", CardHolderName: "  ", ExpMonth: 12, ExpYear: 2030},
 			wantErr: domain.ErrCardHolderNameRequired,
 		},
 		{
@@ -134,7 +146,7 @@ func TestCreateCardHandler_Handle_NormalizesPANBeforeHashing(t *testing.T) {
 		hasher := &fakeHasher{}
 		h := command.NewCreateCardHandler(repo, hasher)
 
-		_, err := h.Handle(context.Background(), command.CreateCard{PAN: pan, CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030})
+		_, err := h.Handle(context.Background(), command.CreateCard{IdempotencyKey: "key-1", PAN: pan, CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030})
 
 		if err != nil {
 			t.Fatalf("%q: unexpected error: %v", pan, err)
@@ -148,9 +160,40 @@ func TestCreateCardHandler_Handle_NormalizesPANBeforeHashing(t *testing.T) {
 	}
 }
 
+func TestCreateCardHandler_Handle_PassesTheIdempotencyKeyToTheRepository(t *testing.T) {
+	repo := &fakeRepo{}
+	h := command.NewCreateCardHandler(repo, &fakeHasher{})
+
+	_, err := h.Handle(context.Background(), command.CreateCard{IdempotencyKey: "key-42", PAN: "4111111111111111", CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.gotKey != "key-42" {
+		t.Errorf("repository got key %q, want key-42", repo.gotKey)
+	}
+}
+
+func TestCreateCardHandler_Handle_ReturnsTheStoredCardOnAReplayedKey(t *testing.T) {
+	original, err := domain.UnmarshalCardFromDatabase("original-id", "4242", 6, 2031, "Grace Hopper", domain.Unknown, "other-hash", time.Now(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := command.NewCreateCardHandler(&fakeRepo{stored: original}, &fakeHasher{})
+
+	got, err := h.Handle(context.Background(), command.CreateCard{IdempotencyKey: "key-1", PAN: "4111111111111111", CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != original {
+		t.Errorf("returned card %q, want the stored card %q", got.ID(), original.ID())
+	}
+}
+
 func TestCreateCardHandler_Handle_GeneratesDistinctIDs(t *testing.T) {
 	h := command.NewCreateCardHandler(&fakeRepo{}, &fakeHasher{})
-	cmd := command.CreateCard{PAN: "4111111111111111", CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030}
+	cmd := command.CreateCard{IdempotencyKey: "key-1", PAN: "4111111111111111", CardHolderName: "Ada Lovelace", ExpMonth: 12, ExpYear: 2030}
 
 	first, err := h.Handle(context.Background(), cmd)
 	if err != nil {

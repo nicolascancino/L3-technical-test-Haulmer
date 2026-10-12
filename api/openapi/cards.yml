@@ -13,6 +13,12 @@ paths:
     post:
       operationId: createCard
       summary: Create a card
+      description: A repeated Idempotency-Key returns the card created the first time instead of creating another one.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
       requestBody:
         required: true
         content:

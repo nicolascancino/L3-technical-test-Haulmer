@@ -14,4 +14,5 @@ var (
 	ErrCardNotFound           = errors.New("card not found")
 	ErrCardAlreadyExists      = errors.New("card already exists")
 	ErrInvalidCursor          = errors.New("invalid cursor")
+	ErrIdempotencyKeyRequired = errors.New("idempotency key is required")
 )

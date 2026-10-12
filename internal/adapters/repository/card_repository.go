@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/adapters/repository/tables"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/app/query"
@@ -23,16 +24,33 @@ func NewCardRepository(db *gorm.DB) CardRepository {
 	return CardRepository{db: db}
 }
 
-func (r CardRepository) AddCard(ctx context.Context, c *domain.Card) error {
-	row, err := toTable(c)
+func (r CardRepository) AddCard(ctx context.Context, key string, c *domain.Card) (*domain.Card, error) {
+	table, err := toTable(c)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	err = r.db.WithContext(ctx).Create(&row).Error
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return fmt.Errorf("%w: %s", domain.ErrCardAlreadyExists, c.ID())
+	table.IdempotencyKey = key
+
+	db := r.db.WithContext(ctx)
+	result := db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "idempotency_key"}},
+		DoNothing: true,
+	}).Create(&table)
+	if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
+		return nil, fmt.Errorf("%w: %s", domain.ErrCardAlreadyExists, c.ID())
 	}
-	return err
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected > 0 {
+		return c, nil
+	}
+
+	var existing tables.Card
+	if err := db.Take(&existing, "idempotency_key = ?", key).Error; err != nil {
+		return nil, err
+	}
+	return toCard(existing)
 }
 
 func (r CardRepository) findCard(ctx context.Context, id domain.CardID) (tables.Card, error) {

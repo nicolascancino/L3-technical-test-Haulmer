@@ -28,6 +28,13 @@ func toTable(c *domain.Card) (tables.Card, error) {
 	}, nil
 }
 
+func toCard(r tables.Card) (*domain.Card, error) {
+	return domain.UnmarshalCardFromDatabase(
+		domain.CardID(r.ID), r.Last4, r.ExpMonth, r.ExpYear,
+		r.CardHolderName, domain.CardBrand(r.Brand), r.PANHash, r.CreatedAt.UTC(), r.UpdatedAt.UTC(),
+	)
+}
+
 func toQueryCard(r tables.Card) query.Card {
 	return query.Card{
 		ID:             r.ID,

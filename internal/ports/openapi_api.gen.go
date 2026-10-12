@@ -19,7 +19,7 @@ type ServerInterface interface {
 	ListCards(w http.ResponseWriter, r *http.Request, params ListCardsParams)
 	// CreateCard Create a card
 	// (POST /cards)
-	CreateCard(w http.ResponseWriter, r *http.Request)
+	CreateCard(w http.ResponseWriter, r *http.Request, params CreateCardParams)
 	// GetCard Get a card by id
 	// (GET /cards/{id})
 	GetCard(w http.ResponseWriter, r *http.Request, id string)
@@ -43,7 +43,7 @@ func (_ Unimplemented) ListCards(w http.ResponseWriter, r *http.Request, params 
 
 // CreateCard Create a card
 // (POST /cards)
-func (_ Unimplemented) CreateCard(w http.ResponseWriter, r *http.Request) {
+func (_ Unimplemented) CreateCard(w http.ResponseWriter, r *http.Request, params CreateCardParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -123,8 +123,39 @@ func (siw *ServerInterfaceWrapper) ListCards(w http.ResponseWriter, r *http.Requ
 // CreateCard operation middleware
 func (siw *ServerInterfaceWrapper) CreateCard(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateCardParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateCard(w, r)
+		siw.Handler.CreateCard(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {

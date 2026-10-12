@@ -47,6 +47,28 @@ func TestToTable(t *testing.T) {
 	}
 }
 
+func TestToCard(t *testing.T) {
+	santiago := time.FixedZone("UTC-3", -3*60*60)
+	local := time.Date(2026, 10, 10, 9, 0, 0, 0, santiago)
+	row := tables.Card{
+		ID: "0190ab12-0000-7000-8000-000000000000", CardHolderName: "Ada Lovelace", Brand: "visa", PANHash: "hash",
+		Last4: "1111", ExpMonth: 12, ExpYear: 2030, CreatedAt: local, UpdatedAt: local,
+	}
+
+	got, err := toCard(row)
+
+	if err != nil {
+		t.Fatalf("toCard: %v", err)
+	}
+	if string(got.ID()) != row.ID || got.Last4() != "1111" || got.Brand() != domain.CardBrand("visa") ||
+		got.CardHolderName() != "Ada Lovelace" || got.PANHash() != "hash" || got.ExpMonth() != 12 || got.ExpYear() != 2030 {
+		t.Fatalf("got %+v, want the fields of %+v", got, row)
+	}
+	if got.CreatedAt().Location() != time.UTC || !got.CreatedAt().Equal(local) {
+		t.Errorf("createdAt = %v, want the same instant in UTC", got.CreatedAt())
+	}
+}
+
 func TestParseCardIDMapsNonUUIDToNotFound(t *testing.T) {
 	_, err := parseCardID("not-a-uuid")
 

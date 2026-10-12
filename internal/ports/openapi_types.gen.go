@@ -148,6 +148,11 @@ type ListCardsParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// CreateCardParams defines parameters for CreateCard.
+type CreateCardParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
 // SearchCardsParams defines parameters for SearchCards.
 type SearchCardsParams struct {
 	Last4 string                  `form:"last4" json:"last4"`

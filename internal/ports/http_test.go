@@ -26,9 +26,23 @@ const validPAN = "4111111111111111"
 
 var createdAt = time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC)
 
-type fakeRepo struct{ err error }
+type fakeRepo struct {
+	err    error
+	gotKey string
+	// stored is returned instead of the new card, as the repository does on a replayed key.
+	stored *domain.Card
+}
 
-func (r *fakeRepo) AddCard(context.Context, *domain.Card) error { return r.err }
+func (r *fakeRepo) AddCard(_ context.Context, key string, c *domain.Card) (*domain.Card, error) {
+	r.gotKey = key
+	if r.err != nil {
+		return nil, r.err
+	}
+	if r.stored != nil {
+		return r.stored, nil
+	}
+	return c, nil
+}
 
 type fakeReader struct {
 	card query.Card
@@ -81,6 +95,9 @@ func newHandler(repo *fakeRepo, reader *fakeReader) http.Handler {
 
 func do(h http.Handler, method, target, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, target, strings.NewReader(body))
+	if method == http.MethodPost {
+		req.Header.Set("Idempotency-Key", "key-1")
+	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec
@@ -189,6 +206,55 @@ func TestCreateCard(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateCard_BlankIdempotencyKeyIsRejected(t *testing.T) {
+	repo := &fakeRepo{}
+	req := httptest.NewRequest(http.MethodPost, "/cards", strings.NewReader(`{"pan":"`+validPAN+`","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099}`))
+	req.Header.Set("Idempotency-Key", "  ")
+	rec := httptest.NewRecorder()
+
+	newHandler(repo, &fakeReader{}).ServeHTTP(rec, req)
+
+	assertResponse(t, rec, http.StatusBadRequest, `"slug":"idempotency_key_required"`)
+	if repo.gotKey != "" {
+		t.Error("the repository was called without a valid key")
+	}
+}
+
+func TestNewHandler_MissingIdempotencyKeyIsRejectedAsJSON(t *testing.T) {
+	handler := ports.NewHandler(app.Application{}, "test", slog.New(slog.DiscardHandler))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/cards", strings.NewReader(`{"pan":"`+validPAN+`"}`)))
+
+	assertResponse(t, rec, http.StatusBadRequest, `"slug":"invalid_request"`, "Idempotency-Key")
+}
+
+func TestCreateCard_PassesTheIdempotencyKeyToTheRepository(t *testing.T) {
+	repo := &fakeRepo{}
+	req := httptest.NewRequest(http.MethodPost, "/cards", strings.NewReader(`{"pan":"`+validPAN+`","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099}`))
+	req.Header.Set("Idempotency-Key", "key-42")
+	rec := httptest.NewRecorder()
+
+	newHandler(repo, &fakeReader{}).ServeHTTP(rec, req)
+
+	assertResponse(t, rec, http.StatusCreated)
+	if repo.gotKey != "key-42" {
+		t.Errorf("repository got key %q, want key-42", repo.gotKey)
+	}
+}
+
+func TestCreateCard_ReplayedKeyAnswersWithTheOriginalCard(t *testing.T) {
+	original, err := domain.UnmarshalCardFromDatabase("original-id", "4242", 6, 2031, "Grace Hopper", domain.Unknown, "other-hash", createdAt, createdAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := do(newHandler(&fakeRepo{stored: original}, &fakeReader{}), http.MethodPost, "/cards",
+		`{"pan":"`+validPAN+`","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099}`)
+
+	assertResponse(t, rec, http.StatusCreated, `"id":"original-id"`, `"last4":"4242"`, `"cardHolderName":"Grace Hopper"`)
 }
 
 func TestGetCard(t *testing.T) {

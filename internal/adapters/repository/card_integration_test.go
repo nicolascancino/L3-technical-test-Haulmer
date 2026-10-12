@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -93,7 +94,7 @@ func seedCards(t *testing.T) []*domain.Card {
 	}
 	repo := repository.NewCardRepository(testDB)
 	for _, c := range cards {
-		if err := repo.AddCard(context.Background(), c); err != nil {
+		if _, err := repo.AddCard(context.Background(), uuid.NewString(), c); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -113,7 +114,7 @@ func TestAddAndGetCard(t *testing.T) {
 	repo := repository.NewCardRepository(testDB)
 	want := newCard(t, 1, "4242", "visa", "Ada Lovelace", 12, 2030)
 
-	if err := repo.AddCard(context.Background(), want); err != nil {
+	if _, err := repo.AddCard(context.Background(), uuid.NewString(), want); err != nil {
 		t.Fatal(err)
 	}
 	got, err := repo.GetCard(context.Background(), want.ID())
@@ -133,7 +134,7 @@ func TestAddCardRejectsDuplicates(t *testing.T) {
 	cleanDB(t)
 	repo := repository.NewCardRepository(testDB)
 	original := newCard(t, 1, "4242", "visa", "Ada Lovelace", 12, 2030)
-	if err := repo.AddCard(context.Background(), original); err != nil {
+	if _, err := repo.AddCard(context.Background(), uuid.NewString(), original); err != nil {
 		t.Fatal(err)
 	}
 	sameID, err := domain.UnmarshalCardFromDatabase(original.ID(), "1111", 1, 2031, "Other", "visa", "another-hash", baseTime, baseTime)
@@ -148,12 +149,75 @@ func TestAddCardRejectsDuplicates(t *testing.T) {
 
 	for name, card := range map[string]*domain.Card{"same id": sameID, "same pan hash": samePANHash} {
 		t.Run(name, func(t *testing.T) {
-			err := repo.AddCard(context.Background(), card)
+			_, err := repo.AddCard(context.Background(), uuid.NewString(), card)
 
 			if !errors.Is(err, domain.ErrCardAlreadyExists) {
 				t.Fatalf("got %v, want ErrCardAlreadyExists", err)
 			}
 		})
+	}
+}
+
+func TestAddCardReturnsTheOriginalCardOnAReplayedKey(t *testing.T) {
+	cleanDB(t)
+	repo := repository.NewCardRepository(testDB)
+	first := newCard(t, 1, "4242", "visa", "Ada Lovelace", 12, 2030)
+	second := newCard(t, 2, "1111", "visa", "Grace Hopper", 3, 2033)
+
+	stored, err := repo.AddCard(context.Background(), "key-1", first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replayed, err := repo.AddCard(context.Background(), "key-1", second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if stored.ID() != first.ID() || replayed.ID() != first.ID() {
+		t.Fatalf("stored %q and replayed %q, want both %q", stored.ID(), replayed.ID(), first.ID())
+	}
+	if replayed.CardHolderName() != "Ada Lovelace" {
+		t.Errorf("replayed holder = %q, want the original holder", replayed.CardHolderName())
+	}
+	var count int64
+	if err := testDB.Model(&tables.Card{}).Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("stored %d cards (err %v), want 1", count, err)
+	}
+}
+
+func TestAddCardSameKeyConcurrentlyStoresOneCard(t *testing.T) {
+	cleanDB(t)
+	repo := repository.NewCardRepository(testDB)
+	const requests = 8
+	ids := make([]domain.CardID, requests)
+	errs := make([]error, requests)
+
+	var wg sync.WaitGroup
+	for i := 0; i < requests; i++ {
+		card := newCard(t, i, "4242", "visa", "Ada Lovelace", 12, 2030)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			stored, err := repo.AddCard(context.Background(), "key-1", card)
+			errs[i] = err
+			if err == nil {
+				ids[i] = stored.ID()
+			}
+		}()
+	}
+	wg.Wait()
+
+	for i := 0; i < requests; i++ {
+		if errs[i] != nil {
+			t.Fatalf("request %d: %v", i, errs[i])
+		}
+		if ids[i] != ids[0] {
+			t.Fatalf("request %d got card %q, want %q", i, ids[i], ids[0])
+		}
+	}
+	var count int64
+	if err := testDB.Model(&tables.Card{}).Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("stored %d cards (err %v), want 1", count, err)
 	}
 }
 
@@ -317,7 +381,7 @@ func TestReadsReturnUTC(t *testing.T) {
 	cleanDB(t)
 	card := newCard(t, 1, "4242", "visa", "Ada Lovelace", 12, 2030)
 	repo := repository.NewCardRepository(testDB)
-	if err := repo.AddCard(context.Background(), card); err != nil {
+	if _, err := repo.AddCard(context.Background(), uuid.NewString(), card); err != nil {
 		t.Fatal(err)
 	}
 

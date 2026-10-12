@@ -34,7 +34,7 @@ func NewHttpServer(application app.Application, instance string) HttpServer {
 	return HttpServer{app: application, instance: instance}
 }
 
-func (h HttpServer) CreateCard(w http.ResponseWriter, r *http.Request) {
+func (h HttpServer) CreateCard(w http.ResponseWriter, r *http.Request, params CreateCardParams) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -51,6 +51,7 @@ func (h HttpServer) CreateCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	card, err := h.app.Commands.CreateCard.Handle(r.Context(), command.CreateCard{
+		IdempotencyKey: params.IdempotencyKey,
 		PAN:            body.Pan,
 		CardHolderName: body.CardHolderName,
 		ExpMonth:       body.ExpMonth,
@@ -221,6 +222,8 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, r, http.StatusNotFound, "card_not_found", domain.ErrCardNotFound.Error())
 	case errors.Is(err, domain.ErrCardAlreadyExists):
 		writeError(w, r, http.StatusConflict, "card_already_exists", domain.ErrCardAlreadyExists.Error())
+	case errors.Is(err, domain.ErrIdempotencyKeyRequired):
+		writeError(w, r, http.StatusBadRequest, "idempotency_key_required", domain.ErrIdempotencyKeyRequired.Error())
 	case errors.Is(err, domain.ErrInvalidCursor):
 		writeError(w, r, http.StatusBadRequest, "invalid_cursor", domain.ErrInvalidCursor.Error())
 	default:

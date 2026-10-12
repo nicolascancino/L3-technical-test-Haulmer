@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +15,7 @@ type PANHasher interface {
 }
 
 type CreateCard struct {
+	IdempotencyKey string
 	PAN            string
 	CardHolderName string
 	ExpMonth       int
@@ -36,6 +38,10 @@ func NewCreateCardHandler(repo domain.CardRepository, hasher PANHasher) CreateCa
 }
 
 func (h CreateCardHandler) Handle(ctx context.Context, cmd CreateCard) (*domain.Card, error) {
+	if strings.TrimSpace(cmd.IdempotencyKey) == "" {
+		return nil, domain.ErrIdempotencyKeyRequired
+	}
+
 	pan := domain.NormalizePAN(cmd.PAN)
 
 	panHash, err := h.hasher.Hash(pan)
@@ -60,8 +66,5 @@ func (h CreateCardHandler) Handle(ctx context.Context, cmd CreateCard) (*domain.
 	if err != nil {
 		return nil, err
 	}
-	if err := h.repo.AddCard(ctx, card); err != nil {
-		return nil, err
-	}
-	return card, nil
+	return h.repo.AddCard(ctx, cmd.IdempotencyKey, card)
 }
