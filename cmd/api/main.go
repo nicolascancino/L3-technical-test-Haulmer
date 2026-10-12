@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/adapters/repository"
+	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/adapters/secrets"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/config"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/logging"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/ports"
@@ -28,7 +30,14 @@ func main() {
 }
 
 func run() error {
-	cfg, err := config.Load(os.Getenv)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	awsSecrets, err := secrets.NewAWSClient(ctx, os.Getenv("AWS_REGION"))
+	if err != nil {
+		return err
+	}
+	cfg, err := config.Load(ctx, os.Getenv, awsSecrets)
 	if err != nil {
 		return err
 	}
@@ -48,10 +57,17 @@ func run() error {
 	})
 	slog.SetDefault(logger)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	db, err := repository.OpenDB(cfg, logger)
+	if err != nil {
+		return err
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	defer sqlDB.Close()
 
-	application, err := service.NewApplication(ctx, cfg, logger)
+	application, err := service.NewApplication(cfg, db)
 	if err != nil {
 		return err
 	}

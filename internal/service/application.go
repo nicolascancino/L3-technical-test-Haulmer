@@ -1,19 +1,12 @@
 package service
 
 import (
-	"context"
 	"fmt"
-	"log/slog"
-	"net"
-	"net/url"
-	"time"
 
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/adapters/repository"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/adapters/repository/tables"
-	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/adapters/secrets"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/adapters/security"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/app"
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/app/command"
@@ -21,32 +14,15 @@ import (
 	"github.com/nicolascancino/L3-technical-test-Haulmer-/internal/config"
 )
 
-func NewApplication(ctx context.Context, cfg config.Config, logger *slog.Logger) (app.Application, error) {
-	dbPassword, panSalt := cfg.DBPassword, cfg.PANSalt
-	if cfg.Env == config.Cloud {
-		awsSecrets, err := secrets.NewAWSClient(ctx, cfg.AWSRegion)
-		if err != nil {
-			return app.Application{}, err
+func NewApplication(cfg config.Config, db *gorm.DB) (app.Application, error) {
+	if cfg.RunMigrations {
+		if err := tables.Migrate(db); err != nil {
+			return app.Application{}, fmt.Errorf("migrate database: %w", err)
 		}
-		if dbPassword, panSalt, err = readCloudSecrets(ctx, awsSecrets, cfg); err != nil {
-			return app.Application{}, err
-		}
-	}
-
-	db, err := gorm.Open(postgres.Open(databaseURL(cfg, dbPassword)), &gorm.Config{
-		Logger:         repository.NewGormLogger(logger),
-		TranslateError: true,
-		NowFunc:        func() time.Time { return time.Now().UTC() },
-	})
-	if err != nil {
-		return app.Application{}, fmt.Errorf("open database: %w", err)
-	}
-	if err := tables.Migrate(db); err != nil {
-		return app.Application{}, fmt.Errorf("migrate database: %w", err)
 	}
 
 	cards := repository.NewCardRepository(db)
-	hasher := security.NewHMACPANHasher(panSalt)
+	hasher := security.NewHMACPANHasher(cfg.PANSalt)
 
 	return app.Application{
 		Commands: app.Commands{
@@ -58,15 +34,4 @@ func NewApplication(ctx context.Context, cfg config.Config, logger *slog.Logger)
 			SearchCards: query.NewSearchCardsHandler(cards),
 		},
 	}, nil
-}
-
-func databaseURL(cfg config.Config, password string) string {
-	u := url.URL{
-		Scheme:   "postgres",
-		User:     url.UserPassword(cfg.DBUser, password),
-		Host:     net.JoinHostPort(cfg.DBHost, cfg.DBPort),
-		Path:     cfg.DBName,
-		RawQuery: url.Values{"sslmode": {cfg.DBSSLMode}, "TimeZone": {"UTC"}}.Encode(),
-	}
-	return u.String()
 }

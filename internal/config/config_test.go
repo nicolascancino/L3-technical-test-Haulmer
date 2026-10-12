@@ -1,6 +1,8 @@
 package config
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"testing"
@@ -34,7 +36,7 @@ func cloudEnv() map[string]string {
 }
 
 func TestLoad_AppliesDefaults(t *testing.T) {
-	cfg, err := Load(env(validEnv()))
+	cfg, err := load(validEnv())
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -52,7 +54,7 @@ func TestLoad_ReadsOverrides(t *testing.T) {
 	values["POD_NAME"] = "cards-api-0"
 	values["DB_SSLMODE"] = "disable"
 
-	cfg, err := Load(env(values))
+	cfg, err := load(values)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -62,7 +64,7 @@ func TestLoad_ReadsOverrides(t *testing.T) {
 }
 
 func TestLoad_FailsOnMissingValues(t *testing.T) {
-	_, err := Load(env(map[string]string{}))
+	_, err := load(map[string]string{})
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -78,7 +80,7 @@ func TestLoad_RejectsUnknownAppEnv(t *testing.T) {
 		values := validEnv()
 		values["APP_ENV"] = value
 
-		_, err := Load(env(values))
+		_, err := load(values)
 		if err == nil || !strings.Contains(err.Error(), "APP_ENV") {
 			t.Errorf("APP_ENV=%q: Load() error = %v, want APP_ENV error", value, err)
 		}
@@ -90,7 +92,7 @@ func TestLoad_LocalRequiresPlainValues(t *testing.T) {
 	delete(values, "DB_PASSWORD")
 	delete(values, "PAN_SALT")
 
-	_, err := Load(env(values))
+	_, err := load(values)
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -107,7 +109,7 @@ func TestLoad_LocalIgnoresSecretSettings(t *testing.T) {
 	values["PAN_SALT_SECRET_ID"] = "cards/salt"
 	values["AWS_REGION"] = "us-east-1"
 
-	cfg, err := Load(env(values))
+	cfg, err := load(values)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -117,7 +119,7 @@ func TestLoad_LocalIgnoresSecretSettings(t *testing.T) {
 }
 
 func TestLoad_CloudReadsSecretSettings(t *testing.T) {
-	cfg, err := Load(env(cloudEnv()))
+	cfg, err := load(cloudEnv())
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -132,7 +134,7 @@ func TestLoad_CloudRequiresSecretSettings(t *testing.T) {
 	delete(values, "PAN_SALT_SECRET_ID")
 	delete(values, "AWS_REGION")
 
-	_, err := Load(env(values))
+	_, err := load(values)
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -148,17 +150,17 @@ func TestLoad_CloudIgnoresPlainValues(t *testing.T) {
 	values["DB_PASSWORD"] = "plain"
 	values["PAN_SALT"] = "plain"
 
-	cfg, err := Load(env(values))
+	cfg, err := load(values)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.DBPassword != "" || cfg.PANSalt != "" {
+	if cfg.DBPassword != "db-secret" || cfg.PANSalt != "salt-secret" {
 		t.Errorf("plain values were read in cloud: %+v", cfg)
 	}
 }
 
 func TestLoad_LoggingDefaultsFollowAppEnv(t *testing.T) {
-	local, err := Load(env(validEnv()))
+	local, err := load(validEnv())
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -166,7 +168,7 @@ func TestLoad_LoggingDefaultsFollowAppEnv(t *testing.T) {
 		t.Errorf("local logging = %v, %q", local.LogLevel, local.LogFormat)
 	}
 
-	cloud, err := Load(env(cloudEnv()))
+	cloud, err := load(cloudEnv())
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -180,7 +182,7 @@ func TestLoad_ReadsLoggingOverrides(t *testing.T) {
 	values["LOG_LEVEL"] = "debug"
 	values["LOG_FORMAT"] = "text"
 
-	cfg, err := Load(env(values))
+	cfg, err := load(values)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -195,7 +197,7 @@ func TestLoad_ReportsInvalidLoggingValuesWithOtherErrors(t *testing.T) {
 	values["LOG_LEVEL"] = "verbose"
 	values["LOG_FORMAT"] = "xml"
 
-	_, err := Load(env(values))
+	_, err := load(values)
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -203,5 +205,98 @@ func TestLoad_ReportsInvalidLoggingValuesWithOtherErrors(t *testing.T) {
 		if !strings.Contains(err.Error(), name) {
 			t.Errorf("error %q does not name %s", err, name)
 		}
+	}
+}
+
+func TestLoad_RunMigrations(t *testing.T) {
+	tests := map[string]bool{"": true, "true": true, "false": false}
+	for raw, want := range tests {
+		values := validEnv()
+		values["RUN_MIGRATIONS"] = raw
+
+		cfg, err := load(values)
+		if err != nil {
+			t.Fatalf("RUN_MIGRATIONS=%q: Load() error = %v", raw, err)
+		}
+		if cfg.RunMigrations != want {
+			t.Errorf("RUN_MIGRATIONS=%q: RunMigrations = %v, want %v", raw, cfg.RunMigrations, want)
+		}
+	}
+}
+
+func TestLoad_RejectsInvalidRunMigrations(t *testing.T) {
+	values := validEnv()
+	values["RUN_MIGRATIONS"] = "maybe"
+
+	_, err := load(values)
+
+	if err == nil || !strings.Contains(err.Error(), "RUN_MIGRATIONS") {
+		t.Fatalf("Load() error = %v, want error naming RUN_MIGRATIONS", err)
+	}
+}
+
+type fakeSecrets struct {
+	values map[string]string
+	errs   map[string]error
+}
+
+func (f fakeSecrets) Get(_ context.Context, secretID string) (string, error) {
+	return f.values[secretID], f.errs[secretID]
+}
+
+func cloudSecrets() fakeSecrets {
+	return fakeSecrets{values: map[string]string{"cards/db": "db-secret", "cards/salt": "salt-secret"}}
+}
+
+func load(values map[string]string) (Config, error) {
+	return Load(context.Background(), env(values), cloudSecrets())
+}
+
+func TestLoad_CloudReadsSecretValues(t *testing.T) {
+	cfg, err := load(cloudEnv())
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.DBPassword != "db-secret" || cfg.PANSalt != "salt-secret" {
+		t.Errorf("secrets not loaded: password %q, salt %q", cfg.DBPassword, cfg.PANSalt)
+	}
+}
+
+func TestLoad_CloudFailsClosed(t *testing.T) {
+	tests := map[string]struct {
+		secrets  fakeSecrets
+		secretID string
+	}{
+		"read error": {
+			secrets:  fakeSecrets{values: map[string]string{"cards/db": "pw"}, errs: map[string]error{"cards/salt": errors.New("denied")}},
+			secretID: "cards/salt",
+		},
+		"empty secret": {
+			secrets:  fakeSecrets{values: map[string]string{"cards/db": "", "cards/salt": "salt"}},
+			secretID: "cards/db",
+		},
+		"blank secret": {
+			secrets:  fakeSecrets{values: map[string]string{"cards/db": "pw", "cards/salt": "  \n"}},
+			secretID: "cards/salt",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := Load(context.Background(), env(cloudEnv()), tc.secrets)
+
+			if err == nil || !strings.Contains(err.Error(), tc.secretID) {
+				t.Fatalf("Load() error = %v, want error naming %q", err, tc.secretID)
+			}
+		})
+	}
+}
+
+func TestLoad_LocalDoesNotReadSecrets(t *testing.T) {
+	cfg, err := Load(context.Background(), env(validEnv()), nil)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.DBPassword != "secret" || cfg.PANSalt != "salt" {
+		t.Errorf("local values not loaded: %+v", cfg)
 	}
 }

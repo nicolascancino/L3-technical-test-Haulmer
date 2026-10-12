@@ -121,6 +121,7 @@ All settings come from environment variables, read once at startup. Missing requ
 | `POD_NAME` | no | hostname | Instance identifier returned by `/health` |
 | `LOG_LEVEL` | no | `info` | `debug`, `info`, `warn` or `error` |
 | `LOG_FORMAT` | no | `text` locally, `json` in `cloud` | `text` or `json` |
+| `RUN_MIGRATIONS` | no | `true` | Set to `false` when the schema is managed outside the app |
 
 ### Tests
 
