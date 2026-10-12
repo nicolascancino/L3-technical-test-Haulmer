@@ -14,7 +14,7 @@ How to resume:
 1. `git switch feat/cards-api`, then run `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test -count=1 ./...` (all green at this point). Integration tests need Docker: `go test -tags integration ./internal/adapters/repository/`.
 2. Read plan decisions D1 to D13 in [`odd/plans/cards-api.md`](../plans/cards-api.md).
 3. Local run: `APP_ENV=local DB_HOST=... DB_NAME=... DB_USER=... DB_PASSWORD=... DB_SSLMODE=disable PAN_SALT=... go run ./cmd/api`.
-4. Next: pick from the TODO section at the end of this file. Suggested start: Luhn, expiry and brand detection (pure domain, easy to test).
+4. Next: pick from the TODO section at the end of this file. Suggested start: secure PAN storage or the AWS deployment.
 
 Open points to carry into the next tasks:
 
@@ -134,7 +134,7 @@ Optional improvements to review at the end of the project live in [`odd/requirem
 Deferred phases:
 
 - [x] **Luhn and expiry**: `validatePAN` (12 to 19 digits, Luhn) and `validateExpiry` are implemented with domain tests.
-- [ ] **Brand detection**: `detectBrand` in `internal/domain/card.go`; `brand` is always `unknown` today.
+- [x] **Brand detection**: `detectBrand` recognizes Visa, Mastercard and Amex by prefix and length; other networks (Discover, Diners, JCB) stay `unknown`.
 - [ ] **Secure PAN storage**: only the one-way `panHash` exists; reversible storage (KMS encryption or tokenization) is under research by the human.
 - [x] **Idempotency** by `Idempotency-Key` (unique column on `cards`; plan section 5 and D3).
 - [ ] **Dockerfile, ECS Fargate task definition and service, load balancer, RDS, AWS deployment** (target design is in the README diagram).

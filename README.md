@@ -153,7 +153,7 @@ go test -tags integration ./internal/adapters/repository/   # needs Docker
 
 | Item | State |
 | :--- | :---- |
-| Brand detection | Signature only; `brand` is always `unknown` |
+| Brand detection | Visa, Mastercard and American Express by prefix and length; any other PAN is `unknown` |
 | Reversible PAN storage | Under research; only the one-way hash exists |
 | Dockerfile, ECS Fargate service, load balancer, RDS | Target design, not deployed |
 

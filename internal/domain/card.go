@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strconv"
 	"strings"
 	"time"
 )
@@ -159,8 +160,17 @@ func validateExpiry(month, year int, now time.Time) error {
 	return nil
 }
 
-// TODO: prefix-based detection; signature only, currently returns Unknown.
 func detectBrand(pan string) CardBrand {
+	prefix2, _ := strconv.Atoi(pan[:2])
+	prefix4, _ := strconv.Atoi(pan[:4])
+	switch {
+	case pan[0] == '4' && (len(pan) == 13 || len(pan) == 16 || len(pan) == 19):
+		return Visa
+	case len(pan) == 16 && ((prefix2 >= 51 && prefix2 <= 55) || (prefix4 >= 2221 && prefix4 <= 2720)):
+		return Mastercard
+	case len(pan) == 15 && (prefix2 == 34 || prefix2 == 37):
+		return Amex
+	}
 	return Unknown
 }
 

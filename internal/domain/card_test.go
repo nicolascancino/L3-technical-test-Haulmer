@@ -94,8 +94,8 @@ func TestNewCard(t *testing.T) {
 			if card.PANHash() != "hash-1" {
 				t.Errorf("pan hash = %q, want hash-1", card.PANHash())
 			}
-			if card.Brand() != domain.Unknown {
-				t.Errorf("brand = %q, want %q", card.Brand(), domain.Unknown)
+			if card.Brand() != domain.Visa {
+				t.Errorf("brand = %q, want %q", card.Brand(), domain.Visa)
 			}
 			if !card.UpdatedAt().Equal(now) {
 				t.Errorf("updatedAt = %v, want %v", card.UpdatedAt(), now)
@@ -136,5 +136,36 @@ func TestUnmarshalCardFromDatabase(t *testing.T) {
 				t.Errorf("unexpected card: %+v", card)
 			}
 		})
+	}
+}
+
+func TestNewCard_DetectsBrand(t *testing.T) {
+	now := time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)
+	tests := map[string]domain.CardBrand{
+		"4111111111111111":    domain.Visa,
+		"4222222222222":       domain.Visa,
+		"5555555555554444":    domain.Mastercard,
+		"5105105105105100":    domain.Mastercard,
+		"2223003122003222":    domain.Mastercard,
+		"378282246310005":     domain.Amex,
+		"371449635398431":     domain.Amex,
+		"6011111111111117":    domain.Unknown,
+		"400000000002":        domain.Unknown,
+		"36227206271667":      domain.Unknown,
+		"6200000000000005":    domain.Unknown,
+		"3530111333300000":    domain.Unknown,
+		"4030000000000000003": domain.Visa,
+	}
+	for pan, want := range tests {
+		card, err := domain.NewCard(domain.NewCardConfig{
+			ID: "card-1", PAN: pan, CardHolderName: "Ada", PANHash: "h", ExpMonth: 12, ExpYear: 2030, CreatedAt: now,
+		})
+		if err != nil {
+			t.Errorf("NewCard(%q): %v", pan, err)
+			continue
+		}
+		if card.Brand() != want {
+			t.Errorf("brand of %q = %q, want %q", pan, card.Brand(), want)
+		}
 	}
 }

@@ -131,7 +131,7 @@ func TestCreateCard(t *testing.T) {
 			name:   "creates a card",
 			body:   `{"pan":"` + validPAN + `","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2099}`,
 			status: http.StatusCreated,
-			want:   []string{`"id":"`, `"last4":"1111"`, `"expMonth":12`, `"expYear":2099`, `"cardHolderName":"Ada Lovelace"`, `"brand":"unknown"`, `"createdAt":"`, `"updatedAt":"`},
+			want:   []string{`"id":"`, `"last4":"1111"`, `"expMonth":12`, `"expYear":2099`, `"cardHolderName":"Ada Lovelace"`, `"brand":"visa"`, `"createdAt":"`, `"updatedAt":"`},
 		},
 		{
 			name:   "blank holder name",
