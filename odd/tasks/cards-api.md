@@ -133,9 +133,10 @@ Optional improvements to review at the end of the project live in [`odd/requirem
 
 Deferred phases:
 
-- [ ] **Luhn, expiry and brand detection**: implement `validatePAN`, `validateExpiry` and `detectBrand` in `internal/domain/card.go` with domain tests. Today every PAN and expiry is accepted and `brand` is always `unknown`.
+- [x] **Luhn and expiry**: `validatePAN` (12 to 19 digits, Luhn) and `validateExpiry` are implemented with domain tests.
+- [ ] **Brand detection**: `detectBrand` in `internal/domain/card.go`; `brand` is always `unknown` today.
 - [ ] **Secure PAN storage**: only the one-way `panHash` exists; reversible storage (KMS encryption or tokenization) is under research by the human.
-- [ ] **Idempotency** by `Idempotency-Key` (same Postgres DB; draft in plan section 5).
+- [x] **Idempotency** by `Idempotency-Key` (unique column on `cards`; plan section 5 and D3).
 - [ ] **Dockerfile, ECS Fargate task definition and service, load balancer, RDS, AWS deployment** (target design is in the README diagram).
 
 Open review advisories:

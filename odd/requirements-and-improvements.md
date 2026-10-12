@@ -11,9 +11,9 @@ The plan ([`plans/cards-api.md`](plans/cards-api.md)) holds the decisions; this 
 | Endpoint | `GET /cards/{id}` | Same |
 | Endpoint | `GET /cards?limit=&cursor=` simple pagination | Same |
 | Endpoint | `GET /cards:search?last4=` | Same |
-| Rule | Validate PAN (Luhn) and expiry | Deferred: signatures only in `domain` |
+| Rule | Validate PAN (Luhn) and expiry | Done: 12 to 19 digits, Luhn, expiry valid through the end of its month |
 | Rule | Store the PAN securely | Partly: `panHash` (plan D11); encrypted storage still under research |
-| Rule | Idempotency by `Idempotency-Key` | Deferred: draft in plan section 5 |
+| Rule | Idempotency by `Idempotency-Key` | Done: unique column on `cards` (plan D3, section 5) |
 | Infra | HTTPS load balancer, 2+ replicas in private subnets | Deferred |
 | Infra | RDS Postgres or DynamoDB | Postgres chosen (D2) |
 | Infra | Secrets Manager for credentials and salt | Designed (D12), built in T09 |
@@ -51,3 +51,10 @@ Operations:
 - **C6** Structured JSON logs with a request id, never logging the PAN or the body.
 - **C7** Request metrics (count, latency, status) for CloudWatch.
 - **C8** Serve the OpenAPI document from the service.
+
+Idempotency:
+
+- **C9** Store idempotency keys in Redis (ElastiCache) instead of Postgres. Native TTL would expire old keys without a cleanup job, and it fits very high write volume. Trade-off: the key and the card no longer commit in one transaction, so it needs `in progress` and `completed` states and a recovery path for a crash between the two writes. Postgres is kept for the exercise because the key and the card are atomic and no extra infrastructure is needed (plan D3).
+- **C11** Reject an `Idempotency-Key` longer than a sane limit (for example 255 characters). The generated server does not enforce `minLength` or `maxLength`, and a very long key only fails when it reaches the unique index.
+- **C12** Return `422` when an `Idempotency-Key` is reused with a different card (compare the stored `pan_hash`, or a hash of the whole request) instead of returning the original card.
+- **C10** Expire idempotency keys (for example after 24 hours) with a periodic cleanup, or a TTL if C9 is adopted.

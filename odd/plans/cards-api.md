@@ -24,7 +24,7 @@ Explicitly deferred (separate phases, decided later):
 
 - Luhn / expiry **implementation** (only signatures in `domain`).
 - Secure PAN storage (encryption / tokenization). Under research by the human.
-- Idempotency via `Idempotency-Key` (section 5 and D3 are a draft only; nothing is built in this phase).
+- Idempotency via `Idempotency-Key` (built; see section 5 and D3).
 - AWS Secrets Manager (credentials), CloudWatch (observability).
 - Dockerfile, ECS Fargate task definition and service, deployment on AWS.
 
@@ -33,8 +33,7 @@ Explicitly deferred (separate phases, decided later):
 Hexagonal + DDD Lite + CQRS-lite, from the `go-architecture` skill (*Go with the Domain*).
 
 **Classification:** application layer (`app/command`, `app/query`) is required. Creating a card
-will coordinate two repositories (cards + idempotency keys) in one transaction once idempotency is
-added, and the read model differs from the write model (masked PAN, `last4` search, cursor pagination).
+stores the idempotency key with the card in one statement, and the read model differs from the write model (masked PAN, `last4` search, cursor pagination).
 
 ```text
 api/openapi/cards.yml            HTTP contract (source of truth)
@@ -46,7 +45,7 @@ internal/
 │   ├── card.go                  Card entity (private fields: id, cardHolderName, brand, last4, panHash,
 │   │                            expMonth, expYear, createdAt, updatedAt), NewCard, UnmarshalCardFromDatabase,
 │   │                            validatePAN (Luhn), detectBrand and validateExpiry -> signatures only, called by NewCard
-│   ├── repository.go            CardRepository interface (IdempotencyRepository deferred)
+│   ├── repository.go            CardRepository interface
 │   └── errors.go                ErrCardNotFound, ErrInvalidPAN, ErrCardExpired, ...
 ├── app/
 │   ├── app.go                   Application{Commands, Queries}
@@ -72,7 +71,7 @@ Dependency rule: `domain` imports nothing internal; `app` -> `domain`; `ports` -
 | :- | :------- | :-------- |
 | D1 | Contract-first HTTP with OpenAPI + `oapi-codegen` + Chi | Convention of the architecture skill; contract is reviewable documentation |
 | D2 | PostgreSQL (RDS) with GORM (`gorm.io/gorm` + `gorm.io/driver/postgres`) | Human decision. GORM stays inside `adapters/repository`; `gorm` tags live only on the row structs in `tables/`, never on domain entities. The transactional `updateFn` uses `db.Transaction` with `clause.Locking{Strength: "UPDATE"}` |
-| D3 | Idempotency stored in the same Postgres DB | Atomic with card insert; no extra infra. Redis stays as a documented alternative |
+| D3 | The idempotency key is a unique nullable column on `cards`, in the same Postgres DB | One `INSERT ... ON CONFLICT (idempotency_key) DO NOTHING` is atomic and needs no transaction, table or extra infra. A separate table and Redis stay as documented improvements (requirements C9, C10) |
 | D4 | Luhn and expiry validation live in `domain/card.go`, enforced by `NewCard` | Business rules belong to the entity; no entry point can create an invalid card |
 | D5 | API, domain and persistence models are separate | Avoid leaking DB/PAN data through the API |
 | D6 | The domain never calls `time.Now()`: `NewCardConfig` receives `CreatedAt`, so domain rules stay deterministic in tests. `command.CreateCard` reads the clock directly with `time.Now().UTC()`, with no injected clock | Testability of the rules without extra types (AGENTS.md, Simplicity). Handler tests only check that `createdAt` is close to now |
@@ -85,13 +84,16 @@ Dependency rule: `domain` imports nothing internal; `app` -> `domain`; `ports` -
 | D13 | `GET /cards:search` keeps `last4` required and adds optional filters `brand` (exact), `cardHolderName` (case-insensitive prefix) and `expMonth`/`expYear`, combined with AND, plus `limit` and `cursor` with the same rules and cursor as the list | Human decision. `last4` has only 10,000 values, so the result can be large and needs a bound; the extra filters narrow it without turning the endpoint into an unbounded listing. The holder name is personal data, so only a prefix match is offered and it needs an index on `lower(card_holder_name)` |
 | D14 | All timestamps are UTC end to end: the connection sets `TimeZone=UTC`, GORM `NowFunc` returns UTC, rows are mapped with `.UTC()` and the API serializes them as RFC 3339 with `Z` | Human requirement. The Postgres driver returns `timestamptz` in the machine zone otherwise, so list and search differed from create |
 
-## 5. Idempotency semantics (DEFERRED draft, not part of this phase)
+## 5. Idempotency semantics
 
-- `POST /cards` requires `Idempotency-Key`; missing -> `400`.
-- First request: process, store `(key, request_hash, response)` in the same transaction as the card.
-- Same key + same payload hash: return the stored response (same status and body), no new card.
-- Same key + different payload hash: `422` (key reuse with a different request).
-- Concurrent requests with the same key: serialized by the unique constraint on the key.
+- `POST /cards` requires `Idempotency-Key`; missing -> `400 invalid_request`, blank -> `400 idempotency_key_required`.
+- First request with a key: the card is inserted with the key in `cards.idempotency_key`.
+- Same key again: the insert does nothing and the original card is returned (same `201` and body), no new card.
+- Only the key is compared, not the payload: reusing a key with a different card returns the original one (a `422` for that case is a possible improvement).
+- Concurrent requests with the same key: the second waits on the unique index and then returns the original card.
+- A different key with an already registered PAN still fails with `409` through the unique `pan_hash`.
+- Validation errors happen before the insert, so they never consume the key.
+- Keys do not expire.
 
 ## 6. Open points
 

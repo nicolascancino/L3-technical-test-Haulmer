@@ -65,7 +65,7 @@ The full contract is in [`api/openapi/cards.yml`](api/openapi/cards.yml).
 
 | Method | Path | Purpose |
 | :----- | :--- | :------ |
-| `POST` | `/cards` | Create a card |
+| `POST` | `/cards` | Create a card; requires the `Idempotency-Key` header |
 | `GET` | `/cards/{id}` | Get a card by id |
 | `GET` | `/cards?limit=&cursor=` | List cards with cursor pagination |
 | `GET` | `/cards:search?last4=` | Search by last 4 digits; optional `brand`, `cardHolderName` (prefix), `expMonth`, `expYear`, `limit`, `cursor` |
@@ -76,8 +76,13 @@ Example:
 ```bash
 curl -X POST localhost:8080/cards \
   -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: 6f1c2a9e-4d1b-4f0e-9a52-3c2b7d8e1a10' \
   -d '{"pan":"4111111111111111","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2030}'
 ```
+
+Repeating a request with the same `Idempotency-Key` returns the card created the first time (`201` with the same body) instead of creating another one, so a client can retry safely after a timeout. The key is stored with the card and never expires. Only the key is compared: reusing it with a different card returns the original card.
+
+The PAN accepts spaces and hyphens (`4111 1111 1111 1111`); they are removed before validation and hashing. It must be 12 to 19 digits and pass the Luhn check, and the expiry must not be in the past (a card is valid through the end of its expiry month).
 
 Responses never include the PAN or its hash, only `last4`, `brand`, holder name, expiry and timestamps.
 
@@ -85,7 +90,7 @@ Errors share one shape, `{"slug": "...", "message": "...", "requestId": "..."}`:
 
 | Status | Meaning |
 | :----- | :------ |
-| `400` | Malformed request or invalid query parameter |
+| `400` | Malformed request, invalid query parameter or missing or blank `Idempotency-Key` |
 | `404` | Card not found |
 | `409` | A card with the same PAN already exists |
 | `413` | Body larger than 1 MiB |
@@ -97,7 +102,7 @@ Errors share one shape, `{"slug": "...", "message": "...", "requestId": "..."}`:
 Requirements: Go (see `go.mod`) and a Postgres database. Docker is the quickest way to get one:
 
 ```bash
-docker run -d --name cards-db -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=cards -p 5432:5432 postgres:16
+docker compose up -d --wait db
 
 APP_ENV=local DB_HOST=localhost DB_NAME=cards DB_USER=postgres DB_PASSWORD=dev \
   DB_SSLMODE=disable PAN_SALT=any-local-secret go run ./cmd/api
@@ -130,6 +135,8 @@ go build ./... && go vet ./... && go test ./...
 go test -tags integration ./internal/adapters/repository/   # needs Docker
 ```
 
+`make demo` (or `./scripts/demo.sh`) is an end-to-end smoke test: it starts a throwaway Postgres container on port 5432 (stopping any container already publishing that port), builds and runs the API against it, exercises the main flows with `curl` (including an `Idempotency-Key` replay), and tears everything down on exit. It needs Docker and prints `RESULT: PASS` or `RESULT: FAIL`.
+
 ## Observability
 
 - **Logs:** structured `slog` to stdout, so the container log driver ships them to CloudWatch. Every line carries `service`, `env` and `instance`; values under sensitive keys (`pan`, `pan_hash`, `password`, `token`, ...) are masked. GORM logs go through the same logger and never print bound query values.
@@ -146,10 +153,8 @@ go test -tags integration ./internal/adapters/repository/   # needs Docker
 
 | Item | State |
 | :--- | :---- |
-| Luhn and expiry validation | Signatures only in `domain`; any PAN and any expiry are accepted today |
 | Brand detection | Signature only; `brand` is always `unknown` |
 | Reversible PAN storage | Under research; only the one-way hash exists |
-| Idempotency by `Idempotency-Key` | Draft in the plan |
 | Dockerfile, ECS Fargate service, load balancer, RDS | Target design, not deployed |
 
 ## How this was built
