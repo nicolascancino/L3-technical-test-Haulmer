@@ -1,0 +1,105 @@
+name: Terraform
+
+on:
+  pull_request:
+    paths:
+      - 'infra/*/dev/**'
+      - 'infra/*/prod/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/*/dev/**'
+      - 'infra/*/prod/**'
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+env:
+  # Environments that are planned and applied. Add "dev" here to enable it.
+  ENABLED_ENVS: "prod"
+  # Apply order: later components depend on earlier ones.
+  COMPONENT_ORDER: "network secrets rds alb ecs cloudwatch"
+  TF_VERSION: "1.10.5"
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.changes.outputs.matrix }}
+      has_changes: ${{ steps.changes.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed stacks
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          changed=$(git diff --name-only "$base" "${{ github.sha }}" || true)
+
+          items=()
+          for comp in $COMPONENT_ORDER; do
+            for env in $ENABLED_ENVS; do
+              if echo "$changed" | grep -q "^infra/$comp/$env/"; then
+                items+=("{\"dir\":\"infra/$comp/$env\"}")
+              fi
+            done
+          done
+
+          if [ ${#items[@]} -eq 0 ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
+          else
+            joined=$(IFS=,; echo "${items[*]}")
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "matrix={\"include\":[$joined]}" >> "$GITHUB_OUTPUT"
+          fi
+
+  terraform:
+    needs: detect
+    if: needs.detect.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    # Applies run in the prod environment (add required reviewers in repo settings).
+    environment: ${{ github.event_name == 'push' && 'prod' || '' }}
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix: ${{ fromJson(needs.detect.outputs.matrix) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: ${{ github.event_name == 'push' && vars.AWS_APPLY_ROLE_ARN || vars.AWS_PLAN_ROLE_ARN }}
+
+      - name: Format check
+        run: terraform fmt -check -recursive
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Validate
+        run: terraform validate
+
+      - name: Plan
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Apply
+        if: github.event_name == 'push'
+        run: terraform apply -input=false tfplan

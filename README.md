@@ -41,9 +41,9 @@ Each instance is stateless, so any replica can serve any request. `GET /health` 
 Hexagonal layers with a CQRS-lite split. Dependencies point inwards: `domain` imports nothing internal, `app` depends on `domain`, `ports` on `app`, and only `service` wires everything.
 
 ```text
-api/openapi/cards.yml    HTTP contract (source of truth)
-cmd/api/                 entry point
-internal/
+app/api/openapi/cards.yml    HTTP contract (source of truth)
+app/cmd/api/                 entry point
+app/internal/
 ├── domain/              Card entity, errors, repository interface
 ├── app/                 use cases: command/ (create) and query/ (get, list, search)
 ├── ports/               HTTP entry points: Chi router over the generated OpenAPI server
@@ -61,7 +61,7 @@ The HTTP server code is generated from the contract: `./scripts/openapi-http.sh 
 
 ## Endpoints
 
-The full contract is in [`api/openapi/cards.yml`](api/openapi/cards.yml).
+The full contract is in [`app/api/openapi/cards.yml`](app/api/openapi/cards.yml).
 
 | Method | Path | Purpose |
 | :----- | :--- | :------ |
@@ -99,7 +99,7 @@ Errors share one shape, `{"slug": "...", "message": "...", "requestId": "..."}`:
 
 ## Run locally
 
-Requirements: Go (see `go.mod`) and a Postgres database. Docker is the quickest way to get one:
+Everything application-related lives in [`app/`](app/), so run these commands from there (`cd app`). Requirements: Go (see `app/go.mod`) and a Postgres database. Docker is the quickest way to get one:
 
 ```bash
 docker compose up -d --wait db
@@ -137,7 +137,7 @@ go build ./... && go vet ./... && go test ./...
 go test -tags integration ./internal/adapters/repository/   # needs Docker
 ```
 
-`make demo` (or `./scripts/demo.sh`) is an end-to-end smoke test: it starts a throwaway Postgres container on port 5432 (stopping any container already publishing that port), builds and runs the API against it, exercises the main flows with `curl` (including an `Idempotency-Key` replay), and tears everything down on exit. It needs Docker and prints `RESULT: PASS` or `RESULT: FAIL`.
+`make demo` (or `./scripts/demo.sh`, from `app/`) is an end-to-end smoke test: it starts a throwaway Postgres container on port 5432 (stopping any container already publishing that port), builds and runs the API against it, exercises the main flows with `curl` (including an `Idempotency-Key` replay), and tears everything down on exit. It needs Docker and prints `RESULT: PASS` or `RESULT: FAIL`.
 
 ## Observability
 
@@ -158,7 +158,7 @@ go test -tags integration ./internal/adapters/repository/   # needs Docker
 | :--- | :---- |
 | Brand detection for Discover, Diners Club and JCB | Only Visa, Mastercard and American Express are detected; any other PAN is `unknown` |
 | Reversible PAN storage | Not needed by any endpoint; proposal in `odd/requirements-and-improvements.md` (C13) |
-| Dockerfile, ECS Fargate service, load balancer, RDS | Target design, not deployed; only `docker-compose.yml` for the local database exists |
+| Dockerfile, ECS Fargate service, load balancer, RDS | Terraform skeleton in [`infra/`](infra/README.md) (components empty, never planned or applied); no Dockerfile yet; only `docker-compose.yml` for the local database |
 
 ## How this was built
 
