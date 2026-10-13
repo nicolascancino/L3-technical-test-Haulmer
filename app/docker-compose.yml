@@ -1,13 +1,60 @@
+x-api: &api
+  build: .
+  depends_on:
+    db:
+      condition: service_healthy
+  environment: &api-env
+    APP_ENV: ${APP_ENV:-local}
+    DB_HOST: db
+    DB_NAME: ${DB_NAME:-cards}
+    DB_USER: ${DB_USER:-postgres}
+    DB_PASSWORD: ${DB_PASSWORD:-dev}
+    DB_SSLMODE: ${DB_SSLMODE:-disable}
+    PAN_SALT: ${PAN_SALT:-local-salt}
+
 services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_PASSWORD: dev
-      POSTGRES_DB: cards
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev}
+      POSTGRES_DB: ${DB_NAME:-cards}
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 1s
       timeout: 3s
       retries: 30
+
+  # Three stateless replicas; POD_NAME is what GET /health reports.
+  # Only api1 runs the migrations; the others wait for it to be healthy, so the
+  # replicas never race on the schema.
+  api1:
+    <<: *api
+    environment:
+      <<: *api-env
+      POD_NAME: api-1
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+  api2:
+    <<: *api
+    depends_on:
+      api1:
+        condition: service_healthy
+    environment:
+      <<: *api-env
+      POD_NAME: api-2
+      RUN_MIGRATIONS: "false"
+  api3:
+    <<: *api
+    depends_on:
+      api1:
+        condition: service_healthy
+    environment:
+      <<: *api-env
+      POD_NAME: api-3
+      RUN_MIGRATIONS: "false"

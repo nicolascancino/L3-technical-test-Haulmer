@@ -1,0 +1,68 @@
+{
+  "info": {
+    "name": "Cards API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://haulmer-cards-prod-405309338.us-east-1.elb.amazonaws.com" },
+    { "key": "cardId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      }
+    },
+    {
+      "name": "Create card",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201 || pm.response.code === 200) {",
+              "  pm.collectionVariables.set('cardId', pm.response.json().id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{$guid}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pan\": \"4111111111111111\",\n  \"cardHolderName\": \"Maria Cancino\",\n  \"expMonth\": 12,\n  \"expYear\": 2030\n}"
+        },
+        "url": "{{baseUrl}}/cards"
+      }
+    },
+    {
+      "name": "List cards",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/cards?limit=10"
+      }
+    },
+    {
+      "name": "Get card by id",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/cards/{{cardId}}"
+      }
+    },
+    {
+      "name": "Search cards",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/cards:search?last4=1111&limit=10"
+      }
+    }
+  ]
+}

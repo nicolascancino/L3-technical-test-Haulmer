@@ -4,37 +4,61 @@ REST API in Go to create and query credit cards. Hexagonal architecture, Postgre
 
 ## Architecture
 
-Target deployment: clients reach the API through an HTTPS load balancer that spreads traffic across replicas running in private subnets, all talking to one Postgres database.
+Clients reach the API through an HTTPS Application Load Balancer that spreads traffic across two ECS Fargate tasks, one per availability zone, all talking to one RDS Postgres database.
 
 ```mermaid
 flowchart LR
-    client["App client"]
-    alb["Application Load Balancer<br/>HTTPS"]
+    client["Client"]
 
-    subgraph private["Private subnets"]
-        direction TB
-        i1["API instance 1<br/>ECS Fargate task"]
-        i2["API instance 2<br/>ECS Fargate task"]
-        db[("Postgres<br/>RDS")]
+    subgraph vpc["VPC 10.0.0.0/16 (us-east-1)"]
+        alb["Application Load Balancer<br/>HTTPS :443 (self-signed cert)"]
+
+        subgraph az1["AZ 1"]
+            subgraph pub1["Public subnet"]
+                t1["ECS Fargate task 1<br/>:8080"]
+            end
+            subgraph priv1["Private subnet"]
+                db[("RDS Postgres 16<br/>db.t4g.micro")]
+            end
+        end
+
+        subgraph az2["AZ 2"]
+            subgraph pub2["Public subnet"]
+                t2["ECS Fargate task 2<br/>:8080"]
+            end
+            subgraph priv2["Private subnet"]
+                dbsub["DB subnet group"]
+            end
+        end
     end
 
+    ecr["ECR<br/>haulmer-cards-api"]
     secrets["Secrets Manager<br/>DB password, PAN salt"]
-    logs["CloudWatch<br/>logs and metrics"]
+    logs["CloudWatch<br/>logs, metrics, 3 alarms"]
+    gh["GitHub Actions<br/>OIDC, no static keys"]
 
     client -->|HTTPS| alb
-    alb --> i1
-    alb --> i2
-    i1 --> db
-    i2 --> db
-    i1 -.-> secrets
-    i2 -.-> secrets
-    i1 -.-> logs
-    i2 -.-> logs
+    alb -->|/health| t1
+    alb --> t2
+    t1 -->|5432| db
+    t2 -->|5432| db
+    t1 -.-> secrets
+    t2 -.-> secrets
+    t1 -.-> logs
+    t2 -.-> logs
+    gh -->|push image| ecr
+    gh -->|deploy| t1
+    ecr -.->|pull| t1
+    ecr -.->|pull| t2
 ```
 
-> **Status:** the application is built and runs locally. The AWS infrastructure above is the target design and is **not deployed yet** (see [Not built yet](#not-built-yet)).
+> **Deviation from the brief:** the tasks run in public subnets (with a public IP) instead of private ones, to avoid the cost of a NAT Gateway. Security groups chain ALB, tasks and database so only the ALB reaches the tasks on 8080 and only the tasks reach the database on 5432. The database stays in private subnets. Moving the tasks to private subnets needs a NAT Gateway or VPC endpoints for ECR, S3, Logs and Secrets Manager.
 
 Each instance is stateless, so any replica can serve any request. `GET /health` returns the identifier of the instance that answered, which makes the load distribution visible.
+
+### Evidence
+
+Load distribution measured against the deployed ALB is in [`evidence/aws/`](evidence/aws/): 3000 requests to `GET /health` with `hey` (all `200`), plus a per-instance count taken while the load ran. The two tasks answered about half each (154 and 146 of 300).
 
 ### Code layout
 
@@ -139,6 +163,40 @@ go test -tags integration ./internal/adapters/repository/   # needs Docker
 
 `make demo` (or `./scripts/demo.sh`, from `app/`) is an end-to-end smoke test: it starts a throwaway Postgres container on port 5432 (stopping any container already publishing that port), builds and runs the API against it, exercises the main flows with `curl` (including an `Idempotency-Key` replay), and tears everything down on exit. It needs Docker and prints `RESULT: PASS` or `RESULT: FAIL`.
 
+## Deploy on AWS
+
+The infrastructure is Terraform under [`infra/`](infra/README.md), one state per component. The one-time setup (state bucket, GitHub roles, repository variables) and the pipeline are described there. Apply the stacks in this order, each with `terraform init && terraform apply` from `infra/<component>/prod`:
+
+`ecr` → push the first image → `network` → `secrets` → `rds` → `alb` → `ecs` → `cloudwatch`
+
+First image, from `app/` (the `ecs` stack starts from the `latest` tag):
+
+```bash
+REGISTRY=<account-id>.dkr.ecr.us-east-1.amazonaws.com
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $REGISTRY
+docker build -t $REGISTRY/haulmer-cards-api:latest .
+docker push $REGISTRY/haulmer-cards-api:latest
+```
+
+After that, every push to `main` that changes `app/` builds the image, pushes it to ECR and rolls the ECS service ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
+The certificate is self-signed, so `curl` needs `-k`. `<alb>` is the `dns_name` output of the `alb` stack:
+
+```bash
+curl -k https://<alb>/health
+
+curl -k -X POST https://<alb>/cards \
+  -H 'Content-Type: application/json' \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"pan":"4111111111111111","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2030}'
+
+curl -k 'https://<alb>/cards:search?last4=1111'
+```
+
+A Postman collection with all endpoints is in [`app/api/postman/`](app/api/postman/cards-api.postman_collection.json).
+
+The ALB, RDS and Fargate tasks bill by the hour. Run `terraform destroy` in reverse order when you are done testing; `ecr`, `iam` and `bootstrap` can stay.
+
 ## Observability
 
 - **Logs:** structured `slog` to stdout, so the container log driver ships them to CloudWatch. Every line carries `service`, `env` and `instance`; values under sensitive keys (`pan`, `pan_hash`, `password`, `token`, ...) are masked. GORM logs go through the same logger and never print bound query values.
@@ -158,7 +216,10 @@ go test -tags integration ./internal/adapters/repository/   # needs Docker
 | :--- | :---- |
 | Brand detection for Discover, Diners Club and JCB | Only Visa, Mastercard and American Express are detected; any other PAN is `unknown` |
 | Reversible PAN storage | Not needed by any endpoint; proposal in `odd/requirements-and-improvements.md` (C13) |
-| Dockerfile, ECS Fargate service, load balancer, RDS | Terraform skeleton in [`infra/`](infra/README.md) (components empty, never planned or applied); no Dockerfile yet; only `docker-compose.yml` for the local database |
+| Tasks in private subnets | Tasks run in public subnets to avoid a NAT Gateway; see the deviation note under Architecture |
+| Trusted TLS certificate | The ALB uses a self-signed certificate; a real domain and an ACM certificate would replace it |
+| Narrow permissions for the apply role | The Terraform apply role has `AdministratorAccess`; it should be scoped to the services in use |
+| Alarm notifications | The three CloudWatch alarms exist but notify no one (no SNS topic) |
 
 ## How this was built
 
