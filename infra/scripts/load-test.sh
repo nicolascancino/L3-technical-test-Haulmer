@@ -2,12 +2,12 @@
 # Ephemeral load test: apply the stacks, hit GET /health through the ALB,
 # save the evidence and always destroy everything on exit.
 #
-# Usage: ENV=dev infra/scripts/load-test.sh
+# Usage: infra/scripts/load-test.sh  (ENV defaults to prod, the only environment applied)
 # Optional: REQUESTS (2000), CONCURRENCY (50), HEALTH_TIMEOUT seconds (600),
 #           EVIDENCE_DIR (evidence/aws), BASE_URL (skips the terraform output lookup).
 set -euo pipefail
 
-ENV="${ENV:-dev}"
+ENV="${ENV:-prod}"
 REQUESTS="${REQUESTS:-2000}"
 CONCURRENCY="${CONCURRENCY:-50}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-600}"
@@ -15,11 +15,6 @@ EVIDENCE_DIR="${EVIDENCE_DIR:-evidence/aws}"
 
 # Creation order; destruction runs in reverse.
 STACKS=(network secrets rds alb ecs cloudwatch)
-
-if [ "$ENV" = "prod" ]; then
-  echo "Refusing to run an ephemeral load test against prod" >&2
-  exit 1
-fi
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tf() { terraform -chdir="$root/infra/$1/$ENV" "${@:2}"; }
@@ -44,7 +39,7 @@ done
 
 # The alb stack must expose an output named dns_name.
 base_url="${BASE_URL:-$(tf alb output -raw dns_name)}"
-case "$base_url" in http*) ;; *) base_url="http://$base_url" ;; esac
+case "$base_url" in http*) ;; *) base_url="https://$base_url" ;; esac
 
 echo "==> Waiting for $base_url/health (up to ${HEALTH_TIMEOUT}s)"
 deadline=$((SECONDS + HEALTH_TIMEOUT))

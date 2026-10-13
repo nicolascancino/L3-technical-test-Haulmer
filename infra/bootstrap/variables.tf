@@ -9,9 +9,3 @@ variable "state_bucket_name" {
   type        = string
   default     = "haulmer-cards-tfstate"
 }
-
-variable "github_repo" {
-  description = "GitHub repository allowed to assume the roles, as owner/name."
-  type        = string
-  default     = "nicolascancino/haulmer-cards-iac"
-}
