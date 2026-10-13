@@ -29,7 +29,7 @@ data "aws_iam_policy_document" "plan_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:pull_request"]
+      values   = ["repo:${var.github_subject}:pull_request"]
     }
   }
 }
@@ -87,7 +87,7 @@ data "aws_iam_policy_document" "apply_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:environment:prod"]
+      values   = ["repo:${var.github_subject}:environment:prod"]
     }
   }
 }
@@ -136,8 +136,8 @@ data "aws_iam_policy_document" "ci_trust" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_repo}:ref:refs/heads/main",
-        "repo:${var.github_repo}:environment:prod",
+        "repo:${var.github_subject}:ref:refs/heads/main",
+        "repo:${var.github_subject}:environment:prod",
       ]
     }
   }
