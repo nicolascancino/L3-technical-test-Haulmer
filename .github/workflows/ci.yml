@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - '.github/workflows/ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - '.github/workflows/ci.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: haulmer-cards-api
+  ECS_CLUSTER: haulmer-cards-prod
+  ECS_SERVICE: haulmer-cards-prod
+  ECS_TASK_FAMILY: haulmer-cards-prod
+  CONTAINER_NAME: api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app/go.mod
+          cache-dependency-path: app/go.sum
+
+      - run: go vet ./...
+
+      - run: go test ./...
+
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - if: github.event_name == 'push'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - if: github.event_name == 'push'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Pull requests only build the image locally. Pushes tag it for ECR: the SHA is what gets deployed, latest bootstraps new environments.
+      - id: meta
+        run: |
+          registry="${{ steps.ecr.outputs.registry }}"
+          repo="${registry:+$registry/}$ECR_REPOSITORY"
+          echo "image=$repo:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "latest=$repo:latest" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: app
+          push: ${{ github.event_name == 'push' }}
+          provenance: false
+          tags: |
+            ${{ steps.meta.outputs.image }}
+            ${{ steps.meta.outputs.latest }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    if: github.event_name == 'push'
+    needs: image
+    runs-on: ubuntu-latest
+    # Add required reviewers in repo settings to gate deployments.
+    environment: prod
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_TASK_FAMILY" \
+            --query taskDefinition > task-definition.json
+
+      - id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ needs.image.outputs.image }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: ${{ env.ECS_SERVICE }}
+          wait-for-service-stability: true

@@ -21,7 +21,7 @@ env:
   # Environments that are planned and applied. Add "dev" here to enable it.
   ENABLED_ENVS: "prod"
   # Apply order: later components depend on earlier ones.
-  COMPONENT_ORDER: "network secrets rds alb ecs cloudwatch"
+  COMPONENT_ORDER: "ecr network secrets rds alb ecs cloudwatch"
   TF_VERSION: "1.10.5"
 
 jobs:
