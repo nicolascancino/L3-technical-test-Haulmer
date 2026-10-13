@@ -134,6 +134,8 @@ APP_ENV=local DB_HOST=localhost DB_NAME=cards DB_USER=postgres DB_PASSWORD=dev \
 
 The schema is created on startup. The API listens on `PORT` (default `8080`).
 
+`docker compose up --build` starts the database and the API together in containers, with the API on `localhost:8080`.
+
 `make run` does the same in one step (starts the database and the API with a local configuration, for example to try it from Postman) and `make down` removes the database and its data.
 
 ### Configuration
