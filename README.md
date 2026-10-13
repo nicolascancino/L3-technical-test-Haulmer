@@ -99,15 +99,6 @@ The full contract is in [`app/api/openapi/cards.yml`](app/api/openapi/cards.yml)
 | `GET` | `/cards:search?last4=` | Search by last 4 digits; optional `brand`, `cardHolderName` (prefix), `expMonth`, `expYear`, `limit`, `cursor` |
 | `GET` | `/health` | Liveness check that identifies the serving instance |
 
-Example:
-
-```bash
-curl -X POST localhost:8080/cards \
-  -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: 6f1c2a9e-4d1b-4f0e-9a52-3c2b7d8e1a10' \
-  -d '{"pan":"4111111111111111","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2030}'
-```
-
 Repeating a request with the same `Idempotency-Key` returns the card created the first time (`201` with the same body) instead of creating another one, so a client can retry safely after a timeout. The key is stored with the card and never expires. Only the key is compared: reusing it with a different card returns the original card.
 
 The PAN accepts spaces and hyphens (`4111 1111 1111 1111`); they are removed before validation and hashing. It must be 12 to 19 digits and pass the Luhn check, and the expiry must not be in the past (a card is valid through the end of its expiry month).
@@ -124,6 +115,63 @@ Errors share one shape, `{"slug": "...", "message": "...", "requestId": "..."}`:
 | `413` | Body larger than 1 MiB |
 | `422` | Business rule violated |
 | `500` | Unexpected error, with a fixed message |
+
+## Curl examples
+
+Set the base URL once. Locally it is `http://localhost:8080` (after `make run`). On AWS it is the load balancer, whose certificate is self-signed, so add `-k` to every `curl`:
+
+```bash
+BASE=http://localhost:8080          # local
+BASE=https://<alb>                  # AWS: <alb> is the dns_name output of the alb stack
+```
+
+Health check, which also tells you which instance answered:
+
+```bash
+curl $BASE/health
+# {"instance":"Nico","status":"ok"}
+```
+
+Create a card. The `Idempotency-Key` header is required:
+
+```bash
+curl -X POST $BASE/cards \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: 6f1c2a9e-4d1b-4f0e-9a52-3c2b7d8e1a10' \
+  -d '{"pan":"4111111111111111","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2030}'
+# 201 {"brand":"visa","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2030,"id":"<id>","last4":"1111",...}
+```
+
+Sending the same request again with the same `Idempotency-Key` returns the same card (same `id`) instead of creating another one.
+
+Get a card by id (use the `id` returned above):
+
+```bash
+curl $BASE/cards/<id>
+```
+
+List cards with cursor pagination. The response carries `nextCursor` while there are more pages; it is absent on the last one:
+
+```bash
+curl "$BASE/cards?limit=2"
+curl "$BASE/cards?limit=2&cursor=<nextCursor>"
+```
+
+Search by the last 4 digits (`last4` is required; the other filters are optional):
+
+```bash
+curl "$BASE/cards:search?last4=1111"
+curl "$BASE/cards:search?last4=4444&brand=mastercard&cardHolderName=Grace&expMonth=6&expYear=2031&limit=10"
+```
+
+Error responses, using the same `POST /cards` call with a different body or header:
+
+| Case | Change | Result |
+| :--- | :----- | :----- |
+| PAN fails the Luhn check | `"pan":"4111111111111112"` | `422` `invalid_pan` |
+| PAN already stored, new key | repeat the PAN with another `Idempotency-Key` | `409` `card_already_exists` |
+| Missing key | drop the `Idempotency-Key` header | `400` `invalid_request` |
+| Unknown id | `GET /cards/does-not-exist` | `404` `card_not_found` |
 
 ## Run locally
 
@@ -189,18 +237,7 @@ docker push $REGISTRY/haulmer-cards-api:latest
 
 After that, every push to `main` that changes `app/` builds the image, pushes it to ECR and rolls the ECS service ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
-The certificate is self-signed, so `curl` needs `-k`. `<alb>` is the `dns_name` output of the `alb` stack:
-
-```bash
-curl -k https://<alb>/health
-
-curl -k -X POST https://<alb>/cards \
-  -H 'Content-Type: application/json' \
-  -H "Idempotency-Key: $(uuidgen)" \
-  -d '{"pan":"4111111111111111","cardHolderName":"Ada Lovelace","expMonth":12,"expYear":2030}'
-
-curl -k 'https://<alb>/cards:search?last4=1111'
-```
+Once the `ecs` stack is healthy, try the API with the [curl examples](#curl-examples), using the `dns_name` output of the `alb` stack as the base URL.
 
 A Postman collection with all endpoints is in [`app/api/postman/`](app/api/postman/cards-api.postman_collection.json).
 
