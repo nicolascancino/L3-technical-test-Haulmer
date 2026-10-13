@@ -6,6 +6,10 @@ else
 BASH := bash
 endif
 
+-include .env
+-include .env.local
+export
+
 build:
 	go build ./...
 
@@ -21,14 +25,6 @@ openapi_http:
 demo:
 	@$(BASH) scripts/demo.sh
 
-run: export APP_ENV = local
-run: export DB_HOST = localhost
-run: export DB_PORT = 5432
-run: export DB_NAME = cards
-run: export DB_USER = postgres
-run: export DB_PASSWORD = dev
-run: export DB_SSLMODE = disable
-run: export PAN_SALT = local-salt
 run:
 	docker compose up -d --wait db
 	go run ./cmd/api
