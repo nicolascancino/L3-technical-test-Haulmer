@@ -1,4 +1,4 @@
-.PHONY: build test vet openapi_http demo run down
+.PHONY: build test test_integration vet openapi_http demo run down
 
 ifeq ($(OS),Windows_NT)
 BASH := "C:/Program Files/Git/bin/bash.exe"
@@ -15,6 +15,9 @@ build:
 
 test:
 	go test ./...
+
+test_integration:
+	go test -tags integration ./internal/adapters/repository/
 
 vet:
 	go vet ./...

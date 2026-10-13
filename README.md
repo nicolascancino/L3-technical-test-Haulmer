@@ -4,30 +4,31 @@ REST API in Go to create and query credit cards. Hexagonal architecture, Postgre
 
 ## Architecture
 
-Clients reach the API through an HTTPS Application Load Balancer that spreads traffic across two ECS Fargate tasks, one per availability zone, all talking to one RDS Postgres database.
+Clients reach the API through an HTTPS Application Load Balancer that spreads traffic across three ECS Fargate instances in two availability zones, all talking to one RDS Postgres database. An editable draw.io version of the diagram is in [`docs/architecture.drawio`](docs/architecture.drawio).
 
 ```mermaid
-flowchart LR
+flowchart TB
     client["Client"]
 
     subgraph vpc["VPC 10.0.0.0/16 (us-east-1)"]
-        alb["Application Load Balancer<br/>HTTPS :443 (self-signed cert)"]
+        alb["Application Load Balancer<br/>HTTPS :443, self-signed certificate"]
 
-        subgraph az1["AZ 1"]
+        subgraph az1["Availability zone 1"]
             subgraph pub1["Public subnet"]
-                t1["ECS Fargate task 1<br/>:8080"]
+                i1["API instance 1<br/>ECS Fargate :8080"]
+                i2["API instance 2<br/>ECS Fargate :8080"]
             end
             subgraph priv1["Private subnet"]
-                db[("RDS Postgres 16<br/>db.t4g.micro")]
+                db[("RDS Postgres 16<br/>single database, :5432")]
             end
         end
 
-        subgraph az2["AZ 2"]
+        subgraph az2["Availability zone 2"]
             subgraph pub2["Public subnet"]
-                t2["ECS Fargate task 2<br/>:8080"]
+                i3["API instance 3<br/>ECS Fargate :8080"]
             end
             subgraph priv2["Private subnet"]
-                dbsub["DB subnet group"]
+                nodb["No database here<br/>Multi-AZ is off"]
             end
         end
     end
@@ -38,27 +39,30 @@ flowchart LR
     gh["GitHub Actions<br/>OIDC, no static keys"]
 
     client -->|HTTPS| alb
-    alb -->|/health| t1
-    alb --> t2
-    t1 -->|5432| db
-    t2 -->|5432| db
-    t1 -.-> secrets
-    t2 -.-> secrets
-    t1 -.-> logs
-    t2 -.-> logs
+    alb -->|8080| i1
+    alb -->|8080| i2
+    alb -->|8080| i3
+    i1 -->|5432| db
+    i2 -->|5432| db
+    i3 -->|5432| db
+    i1 -.-> secrets
+    i2 -.-> secrets
+    i3 -.-> secrets
+    i1 -.-> logs
+    i2 -.-> logs
+    i3 -.-> logs
     gh -->|push image| ecr
-    gh -->|deploy| t1
-    ecr -.->|pull| t1
-    ecr -.->|pull| t2
+    gh -->|deploy| i1
+    ecr -.->|pull| i1
+    ecr -.->|pull| i2
+    ecr -.->|pull| i3
 ```
 
-> **Deviation from the brief:** the tasks run in public subnets (with a public IP) instead of private ones, to avoid the cost of a NAT Gateway. Security groups chain ALB, tasks and database so only the ALB reaches the tasks on 8080 and only the tasks reach the database on 5432. The database stays in private subnets. Moving the tasks to private subnets needs a NAT Gateway or VPC endpoints for ECR, S3, Logs and Secrets Manager.
-
-Each instance is stateless, so any replica can serve any request. `GET /health` returns the identifier of the instance that answered, which makes the load distribution visible.
+> **Deviation from the brief:** the instances run in public subnets (with a public IP) instead of private ones, to avoid the cost of a NAT Gateway. Security groups chain ALB, instances and database so only the ALB reaches the instances on 8080 and only the instances reach the database on 5432. The database stays in private subnets. Moving the instances to private subnets needs a NAT Gateway or VPC endpoints for ECR, S3, Logs and Secrets Manager.
 
 ### Evidence
 
-Load distribution measured against the deployed ALB is in [`evidence/aws/`](evidence/aws/): 3000 requests to `GET /health` with `hey` (all `200`), plus a per-instance count taken while the load ran. The two tasks answered about half each (154 and 146 of 300).
+Load distribution measured against the deployed ALB is in [`evidence/aws/`](evidence/aws/): 3000 requests to `GET /health` with `hey` (all `200`), plus a per-instance count taken while the load ran. The two instances answered about half each (154 and 146 of 300). A second run with the service scaled to three instances through Terraform (`desired_count = 3`) shows about a third each (102, 101 and 97 of 300).
 
 ### Code layout
 
@@ -123,18 +127,23 @@ Errors share one shape, `{"slug": "...", "message": "...", "requestId": "..."}`:
 
 ## Run locally
 
-Everything application-related lives in [`app/`](app/), so run these commands from there (`cd app`). Requirements: Go (see `app/go.mod`) and a Postgres database. Docker is the quickest way to get one:
+Everything application-related lives in [`app/`](app/), so run these commands from there (`cd app`). Requirements: Go (see `app/go.mod`), Docker and `make`.
 
 ```bash
-docker compose up -d --wait db
-
-APP_ENV=local DB_HOST=localhost DB_NAME=cards DB_USER=postgres DB_PASSWORD=dev \
-  DB_SSLMODE=disable PAN_SALT=any-local-secret go run ./cmd/api
+cp .env.example .env   # once; local settings, ignored by git
+make run
 ```
 
-The schema is created on startup. The API listens on `PORT` (default `8080`).
+`make run` starts Postgres in Docker, waits until it is healthy and runs the API with the settings from `.env` (and `.env.local`, if you create one to override them). The API listens on `localhost:8080` and creates the schema on startup. `make down` removes the database and its data.
 
-`make run` does the same in one step (starts the database and the API with a local configuration, for example to try it from Postman) and `make down` removes the database and its data.
+| Command | What it does |
+| :------ | :----------- |
+| `make run` | Start the database and the API |
+| `make down` | Remove the database and its data |
+| `make build`, `make vet`, `make test` | Build, vet and run the unit tests |
+| `make test_integration` | Repository tests against a real Postgres (needs Docker) |
+| `make demo` | End-to-end smoke test, see [Tests](#tests) |
+| `make openapi_http` | Regenerate the HTTP server code from the OpenAPI contract |
 
 ### Configuration
 
@@ -157,11 +166,11 @@ All settings come from environment variables, read once at startup. Missing requ
 ### Tests
 
 ```bash
-go build ./... && go vet ./... && go test ./...
-go test -tags integration ./internal/adapters/repository/   # needs Docker
+make build vet test
+make test_integration   # repository tests against a real Postgres, needs Docker
 ```
 
-`make demo` (or `./scripts/demo.sh`, from `app/`) is an end-to-end smoke test: it starts a throwaway Postgres container on port 5432 (stopping any container already publishing that port), builds and runs the API against it, exercises the main flows with `curl` (including an `Idempotency-Key` replay), and tears everything down on exit. It needs Docker and prints `RESULT: PASS` or `RESULT: FAIL`.
+`make demo` is an end-to-end smoke test: it starts a throwaway Postgres container on port 5432 (stopping any container already publishing that port), builds and runs the API against it, exercises the main flows with `curl` (including an `Idempotency-Key` replay), and tears everything down on exit. It needs Docker and prints `RESULT: PASS` or `RESULT: FAIL`.
 
 ## Deploy on AWS
 
@@ -195,7 +204,7 @@ curl -k 'https://<alb>/cards:search?last4=1111'
 
 A Postman collection with all endpoints is in [`app/api/postman/`](app/api/postman/cards-api.postman_collection.json).
 
-The ALB, RDS and Fargate tasks bill by the hour. Run `terraform destroy` in reverse order when you are done testing; `ecr`, `iam` and `bootstrap` can stay.
+The ALB, RDS and Fargate instances bill by the hour. Run `terraform destroy` in reverse order when you are done testing; `ecr`, `iam` and `bootstrap` can stay.
 
 ## Observability
 
@@ -216,7 +225,7 @@ The ALB, RDS and Fargate tasks bill by the hour. Run `terraform destroy` in reve
 | :--- | :---- |
 | Brand detection for Discover, Diners Club and JCB | Only Visa, Mastercard and American Express are detected; any other PAN is `unknown` |
 | Reversible PAN storage | Not needed by any endpoint; proposal in `odd/requirements-and-improvements.md` (C13) |
-| Tasks in private subnets | Tasks run in public subnets to avoid a NAT Gateway; see the deviation note under Architecture |
+| Instances in private subnets | Instances run in public subnets to avoid a NAT Gateway; see the deviation note under Architecture |
 | Trusted TLS certificate | The ALB uses a self-signed certificate; a real domain and an ACM certificate would replace it |
 | Narrow permissions for the apply role | The Terraform apply role has `AdministratorAccess`; it should be scoped to the services in use |
 | Alarm notifications | The three CloudWatch alarms exist but notify no one (no SNS topic) |

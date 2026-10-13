@@ -10,8 +10,8 @@ variable "state_bucket_name" {
   default     = "haulmer-cards-tfstate"
 }
 
-variable "github_repo" {
-  description = "GitHub repository allowed to assume the roles, as owner/name."
+variable "github_subject" {
+  description = "Repository part of the GitHub OIDC subject claim. This repository uses immutable subjects, so it is owner@owner_id/name@repo_id, not owner/name. Read it from the sub_claim_prefix of the repository OIDC customization API."
   type        = string
-  default     = "nicolascancino/L3-technical-test-Haulmer-"
+  default     = "nicolascancino@17253388/L3-technical-test-Haulmer-@1411043094"
 }

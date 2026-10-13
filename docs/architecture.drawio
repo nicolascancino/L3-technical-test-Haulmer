@@ -1,0 +1,116 @@
+<mxfile host="drawio-plugin" modified="2026-10-13T20:54:37.856Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36" version="22.1.22" etag="bIKlp2GL5JoPFt8-Qs12" type="embed">
+  <diagram name="Architecture" id="cards-api-architecture">
+    <mxGraphModel dx="1019" dy="916" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Cards API on AWS (prod, us-east-1)" style="text;html=1;fontSize=18;fontStyle=1;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="40" y="10" width="420" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="vpc" value="VPC 10.0.0.0/16" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#248814;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=10;fontStyle=1;fontColor=#248814;" parent="1" vertex="1">
+          <mxGeometry x="200" y="50" width="760" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="az1" value="Availability zone 1 (us-east-1a)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#147EBA;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontColor=#147EBA;" parent="1" vertex="1">
+          <mxGeometry x="230" y="220" width="360" height="500" as="geometry" />
+        </mxCell>
+        <mxCell id="az2" value="Availability zone 2 (us-east-1b)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#147EBA;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontColor=#147EBA;" parent="1" vertex="1">
+          <mxGeometry x="610" y="220" width="330" height="500" as="geometry" />
+        </mxCell>
+        <mxCell id="pub1" value="Public subnet 10.0.0.0/24" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E9F3E6;strokeColor=#248814;verticalAlign=top;align=left;spacingLeft=8;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="250" y="240" width="320" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="pub2" value="Public subnet 10.0.1.0/24" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E9F3E6;strokeColor=#248814;verticalAlign=top;align=left;spacingLeft=8;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="630" y="240" width="290" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="priv1" value="Private subnet 10.0.10.0/24" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6F0F8;strokeColor=#147EBA;verticalAlign=top;align=left;spacingLeft=8;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="250" y="470" width="320" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="priv2" value="Private subnet 10.0.11.0/24" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6F0F8;strokeColor=#147EBA;verticalAlign=top;align=left;spacingLeft=8;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="630" y="470" width="290" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="service" value="ECS service haulmer-cards-prod (3 instances)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#D86613;strokeWidth=2;dashed=1;verticalAlign=top;fontColor=#D86613;fontStyle=1;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="262" y="262" width="600" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="i1" value="API instance 1&lt;br&gt;Fargate :8080" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D86613;" parent="1" vertex="1">
+          <mxGeometry x="275" y="292" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="i2" value="API instance 2&lt;br&gt;Fargate :8080" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D86613;" parent="1" vertex="1">
+          <mxGeometry x="425" y="292" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="i3" value="API instance 3&lt;br&gt;Fargate :8080" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D86613;" parent="1" vertex="1">
+          <mxGeometry x="715" y="292" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="sg-ecs1" value="SG instances: 8080 from the ALB only" style="text;html=1;fontSize=11;fontColor=#C7131F;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="262" y="390" width="290" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="sg-ecs2" value="SG instances: 8080 from the ALB only" style="text;html=1;fontSize=11;fontColor=#C7131F;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="640" y="390" width="270" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="db" value="RDS Postgres 16&lt;br&gt;db.t4g.micro :5432" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#DAE8FC;strokeColor=#6C8EBF;" parent="1" vertex="1">
+          <mxGeometry x="330" y="520" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="dbsub" value="DB subnet group (both private subnets, one database in zone 1)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6C8EBF;dashed=1;strokeWidth=2;verticalAlign=bottom;align=left;spacingLeft=8;fontSize=11;fontColor=#6C8EBF;" parent="1" vertex="1">
+          <mxGeometry x="242" y="462" width="686" height="246" as="geometry" />
+        </mxCell>
+        <mxCell id="db-note" value="No database here. Multi-AZ is off; turning it on would place a standby copy in this subnet." style="text;html=1;fontSize=11;fontStyle=2;fontColor=#666666;align=left;verticalAlign=middle;whiteSpace=wrap;" parent="1" vertex="1">
+          <mxGeometry x="645" y="520" width="260" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="sg-rds" value="SG rds: 5432 from the instances only" style="text;html=1;fontSize=11;fontColor=#C7131F;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="262" y="650" width="290" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="alb" value="Application Load Balancer&lt;br&gt;HTTPS :443 (self-signed certificate)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;" parent="1" vertex="1">
+          <mxGeometry x="470" y="90" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="sg-alb" value="SG alb: 443 from the internet" style="text;html=1;fontSize=11;fontColor=#C7131F;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="705" y="108" width="230" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="client" value="Client" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;" parent="1" vertex="1">
+          <mxGeometry x="40" y="90" width="110" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="gh" value="GitHub Actions&lt;br&gt;OIDC, no static keys" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="1020" y="60" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ecr" value="ECR&lt;br&gt;haulmer-cards-api" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="1020" y="190" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="secrets" value="Secrets Manager&lt;br&gt;DB password, PAN salt" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="1020" y="320" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="logs" value="CloudWatch&lt;br&gt;logs, metrics, 3 alarms" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="1020" y="450" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e-client" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" parent="1" source="client" target="alb" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-alb" value="8080" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" parent="1" source="alb" target="service" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-db" value="5432" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" parent="1" source="service" target="db" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-secrets" value="read secrets" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;dashed=1;" parent="1" source="service" target="secrets" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-logs" value="logs and metrics" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;dashed=1;" parent="1" source="service" target="logs" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-pull" value="pull image" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;dashed=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1020" y="208" as="sourcePoint" />
+            <mxPoint x="562" y="250" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1020" y="209" />
+              <mxPoint x="563" y="209" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-push" value="push image" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" parent="1" source="gh" target="ecr" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="The instances run in public subnets (public IP, no NAT Gateway) to save cost; only the database is private. Solid arrows: request path. Dashed arrows: platform services." style="text;html=1;fontSize=11;align=left;verticalAlign=top;whiteSpace=wrap;" parent="1" vertex="1">
+          <mxGeometry x="200" y="760" width="760" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -68,7 +68,7 @@ jobs:
     if: needs.detect.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     # Applies run in the prod environment (add required reviewers in repo settings).
-    environment: ${{ github.event_name == 'push' && 'prod' || '' }}
+    environment: ${{ github.event_name == 'push' && 'prod' || null }}
     strategy:
       fail-fast: true
       max-parallel: 1
