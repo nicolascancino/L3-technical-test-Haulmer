@@ -12,3 +12,9 @@ hey-load-3-instances.txt                  hey -n 3000 -c 20 on GET /health: 3000
 distribution-under-load-3-instances.txt   300 sequential GET /health sent while hey was running, counted per instance
 
 All three instances answered: 102, 101 and 97 of 300 (about a third each). The three targets were healthy in the target group.
+
+alb-metrics.txt   Application Load Balancer metrics exported from CloudWatch (get-metric-data). RequestCount is exactly 3300 per test
+                  (3000 from hey + 300 from the per-instance count), all of them HTTPCode_Target_2XX. This is independent of the app logs,
+                  which skip /health on purpose. Timestamps are in UTC-3 (Argentina).
+
+The environment was destroyed after collecting this evidence.
