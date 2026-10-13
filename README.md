@@ -58,7 +58,7 @@ Each instance is stateless, so any replica can serve any request. `GET /health` 
 
 ### Evidence
 
-Load distribution measured against the deployed ALB is in [`evidence/aws/`](evidence/aws/): 3000 requests to `GET /health` with `hey` (all `200`), plus a per-instance count taken while the load ran. The two tasks answered about half each (154 and 146 of 300).
+Load distribution measured against the deployed ALB is in [`evidence/aws/`](evidence/aws/): 3000 requests to `GET /health` with `hey` (all `200`), plus a per-instance count taken while the load ran. The two tasks answered about half each (154 and 146 of 300). A second run with the service scaled to three tasks through Terraform (`desired_count = 3`) shows about a third each (102, 101 and 97 of 300).
 
 ### Code layout
 
