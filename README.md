@@ -4,58 +4,17 @@ REST API in Go to create and query credit cards. Hexagonal architecture, Postgre
 
 ## Architecture
 
-Clients reach the API through an HTTPS Application Load Balancer that spreads traffic across three ECS Fargate instances in two availability zones, all talking to one RDS Postgres database. An editable draw.io version of the diagram is in [`docs/architecture.drawio`](docs/architecture.drawio).
+Clients reach the API through an HTTPS Application Load Balancer that spreads traffic across three ECS Fargate instances in two availability zones, all talking to one RDS Postgres database. A detailed, editable draw.io version (availability zones, subnets, security groups, secrets, logs and CI) is in [`docs/architecture.drawio`](docs/architecture.drawio).
 
 ```mermaid
-flowchart TB
-    client["Client"]
-
-    subgraph vpc["VPC 10.0.0.0/16 (us-east-1)"]
-        alb["Application Load Balancer<br/>HTTPS :443, self-signed certificate"]
-
-        subgraph az1["Availability zone 1"]
-            subgraph pub1["Public subnet"]
-                i1["API instance 1<br/>ECS Fargate :8080"]
-                i2["API instance 2<br/>ECS Fargate :8080"]
-            end
-            subgraph priv1["Private subnet"]
-                db[("RDS Postgres 16<br/>single database, :5432")]
-            end
-        end
-
-        subgraph az2["Availability zone 2"]
-            subgraph pub2["Public subnet"]
-                i3["API instance 3<br/>ECS Fargate :8080"]
-            end
-            subgraph priv2["Private subnet"]
-                nodb["No database here<br/>Multi-AZ is off"]
-            end
-        end
-    end
-
-    ecr["ECR<br/>haulmer-cards-api"]
-    secrets["Secrets Manager<br/>DB password, PAN salt"]
-    logs["CloudWatch<br/>logs, metrics, 3 alarms"]
-    gh["GitHub Actions<br/>OIDC, no static keys"]
-
-    client -->|HTTPS| alb
-    alb -->|8080| i1
-    alb -->|8080| i2
-    alb -->|8080| i3
-    i1 -->|5432| db
-    i2 -->|5432| db
-    i3 -->|5432| db
-    i1 -.-> secrets
-    i2 -.-> secrets
-    i3 -.-> secrets
-    i1 -.-> logs
-    i2 -.-> logs
-    i3 -.-> logs
-    gh -->|push image| ecr
-    gh -->|deploy| i1
-    ecr -.->|pull| i1
-    ecr -.->|pull| i2
-    ecr -.->|pull| i3
+flowchart LR
+    client["Client"] -->|HTTPS| alb["Application Load Balancer"]
+    alb --> i1["API instance 1"]
+    alb --> i2["API instance 2"]
+    alb --> i3["API instance 3"]
+    i1 --> db[("RDS Postgres")]
+    i2 --> db
+    i3 --> db
 ```
 
 > **Deviation from the brief:** the instances run in public subnets (with a public IP) instead of private ones, to avoid the cost of a NAT Gateway. Security groups chain ALB, instances and database so only the ALB reaches the instances on 8080 and only the instances reach the database on 5432. The database stays in private subnets. Moving the instances to private subnets needs a NAT Gateway or VPC endpoints for ECR, S3, Logs and Secrets Manager.
@@ -117,6 +76,8 @@ Errors share one shape, `{"slug": "...", "message": "...", "requestId": "..."}`:
 | `500` | Unexpected error, with a fixed message |
 
 ## Curl examples
+
+Prefer a GUI? Import the [Postman collection](app/api/postman/cards-api.postman_collection.json), which covers all endpoints.
 
 Set the base URL once. Locally it is `http://localhost:8080` (after `make run`). On AWS it is the load balancer, whose certificate is self-signed, so add `-k` to every `curl`:
 
